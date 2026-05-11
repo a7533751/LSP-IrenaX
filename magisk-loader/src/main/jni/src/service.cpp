@@ -240,7 +240,11 @@ namespace lspd {
 
         call_boolean_method_va_backup_ = env->functions->CallBooleanMethodV;
         native_interface_replace_.CallBooleanMethodV = &call_boolean_method_va_replace;
-        native_interface_replace_.CallBooleanMethod = &call_boolean_method_replace;
+        if (GetAndroidApiLevel() > __ANDROID_API_P__) {
+            native_interface_replace_.CallBooleanMethod = &call_boolean_method_replace;
+        } else {
+            LOGI("skip direct CallBooleanMethod bridge hook on Android {}", GetAndroidApiLevel());
+        }
 
         if (setTableOverride != nullptr) {
             setTableOverride(&native_interface_replace_);
