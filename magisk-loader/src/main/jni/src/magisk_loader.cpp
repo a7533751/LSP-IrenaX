@@ -22,7 +22,6 @@
 #include <linux/fs.h>
 #include <sys/mman.h>
 #include <array>
-#include <cstddef>
 #include <string_view>
 
 #include "config_impl.h"
@@ -58,30 +57,31 @@ namespace lspd {
             "_ZN3art6mirror5Class9SetStatusENS1_6StatusEPNS_6ThreadE",
     };
 
-    static std::array<void *, kAndroid9BypassedSystemServerArtHooks.size()>
-            android9_bypassed_system_server_art_hook_targets{};
-
-    bool IsAndroid9() {
-        return GetAndroidApiLevel() == __ANDROID_API_P__;
-    }
-
-    void MaybeRecordAndroid9SystemServerArtHook(std::string_view symbol, void *target) {
-        if (!IsAndroid9() || target == nullptr) return;
-        for (std::size_t i = 0; i < kAndroid9BypassedSystemServerArtHooks.size(); ++i) {
-            if (symbol == kAndroid9BypassedSystemServerArtHooks[i]) {
-                android9_bypassed_system_server_art_hook_targets[i] = target;
-                LOGW("bypass Android 9 system_server art inline hook symbol {}", symbol);
-                return;
-            }
-        }
-    }
-
-    bool ShouldBypassAndroid9SystemServerArtHook(void *target) {
-        if (!IsAndroid9() || target == nullptr) return false;
-        for (auto bypassed_target: android9_bypassed_system_server_art_hook_targets) {
-            if (target == bypassed_target) return true;
+    bool ShouldBypassAndroid9SystemServerArtHook(std::string_view symbol) {
+        for (auto bypassed_symbol: kAndroid9BypassedSystemServerArtHooks) {
+            if (symbol == bypassed_symbol) return true;
         }
         return false;
+    }
+
+    struct Android9SystemServerArtHookState {
+        void *target = nullptr;
+        bool enabled = false;
+        bool bypass = false;
+    };
+
+    void RecordAndroid9SystemServerArtHook(Android9SystemServerArtHookState &state,
+                                           std::string_view symbol, void *target) {
+        auto enabled = state.enabled;
+        state = {
+                .target = target,
+                .enabled = enabled,
+                .bypass = enabled && target != nullptr &&
+                          ShouldBypassAndroid9SystemServerArtHook(symbol),
+        };
+        if (state.bypass) {
+            LOGW("bypass Android 9 system_server art inline hook symbol {}", symbol);
+        }
     }
 
     void MagiskLoader::LoadDex(JNIEnv *env, PreloadedDex &&dex) {
@@ -154,9 +154,13 @@ namespace lspd {
             }
 
             // always inject into system server
+            Android9SystemServerArtHookState android9_art_hook_state{
+                    .enabled = use_direct_system_server_bridge &&
+                               GetAndroidApiLevel() == __ANDROID_API_P__,
+            };
             lsplant::InitInfo initInfo{
-                .inline_hooker = [](auto t, auto r) {
-                    if (ShouldBypassAndroid9SystemServerArtHook(t)) [[unlikely]] {
+                .inline_hooker = [&android9_art_hook_state](auto t, auto r) {
+                    if (android9_art_hook_state.bypass && android9_art_hook_state.target == t) [[unlikely]] {
                         return t;
                     }
                     void* bk = nullptr;
@@ -165,14 +169,14 @@ namespace lspd {
                 .inline_unhooker = [](auto t) {
                     return UnhookFunction(t) == RT_SUCCESS ;
                 },
-                .art_symbol_resolver = [](auto symbol) {
+                .art_symbol_resolver = [&android9_art_hook_state](auto symbol) {
                     auto target = GetArt()->getSymbAddress(symbol);
-                    MaybeRecordAndroid9SystemServerArtHook(symbol, target);
+                    RecordAndroid9SystemServerArtHook(android9_art_hook_state, symbol, target);
                     return target;
                 },
-                .art_symbol_prefix_resolver = [](auto symbol) {
+                .art_symbol_prefix_resolver = [&android9_art_hook_state](auto symbol) {
                     auto target = GetArt()->getSymbPrefixFirstAddress(symbol);
-                    MaybeRecordAndroid9SystemServerArtHook(symbol, target);
+                    RecordAndroid9SystemServerArtHook(android9_art_hook_state, symbol, target);
                     return target;
                 },
             };

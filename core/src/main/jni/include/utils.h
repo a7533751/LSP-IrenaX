@@ -24,6 +24,8 @@
 #pragma clang diagnostic ignored "-Wgnu-string-literal-operator-template"
 
 #include <string>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <api/system_properties.h>
 #include <unistd.h>
@@ -35,11 +37,22 @@ namespace lspd {
 
     inline int32_t GetAndroidApiLevel() {
         static int32_t api_level = []() {
-            char prop_value[PROP_VALUE_MAX];
-            __system_property_get("ro.build.version.sdk", prop_value);
-            int base = atoi(prop_value);
-            __system_property_get("ro.build.version.preview_sdk", prop_value);
-            return base + atoi(prop_value);
+            char prop_value[PROP_VALUE_MAX]{};
+            int base = 0;
+            if (__system_property_get("ro.build.version.sdk", prop_value) > 0) {
+                base = atoi(prop_value);
+            }
+            int preview = 0;
+            if (__system_property_get("ro.build.version.preview_sdk", prop_value) > 0) {
+                preview = atoi(prop_value);
+            }
+            char codename[PROP_VALUE_MAX]{};
+            if (preview > 0 &&
+                __system_property_get("ro.build.version.codename", codename) > 0 &&
+                strcmp(codename, "REL") != 0) {
+                return base + preview;
+            }
+            return base;
         }();
         return api_level;
     }
