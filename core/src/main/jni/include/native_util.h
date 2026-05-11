@@ -76,6 +76,11 @@ inline bool RegisterNativeMethodsInternal(JNIEnv *env,
   RegisterNativeMethodsInternal(env, GetNativeBridgeSignature() + #class_name, gMethods, arraysize(gMethods))
 
 inline int HookFunction(void *original, void *replace, void **backup) {
+    if (original == nullptr || replace == nullptr) {
+        LOGW("Skip hook with null target: original={}, replace={}", original, replace);
+        if (backup != nullptr) *backup = nullptr;
+        return RT_FAILED;
+    }
     if constexpr (isDebug) {
         Dl_info info;
         if (dladdr(original, &info))
