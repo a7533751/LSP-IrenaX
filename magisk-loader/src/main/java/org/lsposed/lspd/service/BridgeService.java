@@ -51,6 +51,7 @@ public class BridgeService {
     // for client
     private static IBinder serviceBinder = null;
     private static ILSPosedService service = null;
+    private static boolean systemServerContextDispatched = false;
 
     // for client
     private static final IBinder.DeathRecipient serviceRecipient = new IBinder.DeathRecipient() {
@@ -83,14 +84,24 @@ public class BridgeService {
         } catch (Throwable e) {
             Log.e(TAG, "service link to death: ", e);
         }
+        dispatchSystemServerContext();
+        Log.i(TAG, "binder received");
+    }
+
+    public static void dispatchSystemServerContext() {
+        if (service == null || systemServerContextDispatched) return;
         try {
             IApplicationThread at = ActivityThread.currentActivityThread().getApplicationThread();
             Context ctx = ActivityThread.currentActivityThread().getSystemContext();
             service.dispatchSystemServerContext(at.asBinder(), Context_getActivityToken(ctx), BuildConfig.FLAVOR);
+            systemServerContextDispatched = true;
         } catch (Throwable e) {
             Log.e(TAG, "dispatch context: ", e);
         }
-        Log.i(TAG, "binder received");
+    }
+
+    public static void receiveSystemServerBinder(IBinder binder) {
+        receiveFromBridge(binder);
     }
 
     public static ILSPosedService getService() {

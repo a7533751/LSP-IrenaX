@@ -35,7 +35,9 @@ namespace lspd {
         constexpr static jint DEX_TRANSACTION_CODE = 1310096052;
         constexpr static jint OBFUSCATION_MAP_TRANSACTION_CODE = 724533732;
         constexpr static jint BRIDGE_TRANSACTION_CODE = 1598837584;
+        constexpr static jint REQUEST_LSPOSED_SERVICE_TRANSACTION_CODE = 2;
         constexpr static auto BRIDGE_SERVICE_DESCRIPTOR = "LSPosed"sv;
+        constexpr static auto SYSTEM_SERVER_SERVICE_DESCRIPTOR = "org.lsposed.lspd.service.ILSPSystemServerService"sv;
         constexpr static auto BRIDGE_SERVICE_NAME = "activity"sv;
         constexpr static auto SYSTEM_SERVER_BRIDGE_SERVICE_NAME = "serial"sv;
         constexpr static jint BRIDGE_ACTION_GET_BINDER = 2;
@@ -83,6 +85,8 @@ namespace lspd {
         lsplant::ScopedLocalRef<jobject> RequestSystemServerBinder(JNIEnv *env);
 
         lsplant::ScopedLocalRef<jobject> RequestApplicationBinderFromSystemServer(JNIEnv *env, const lsplant::ScopedLocalRef<jobject> &system_server_binder);
+
+        lsplant::ScopedLocalRef<jobject> RequestLSPosedBinderFromSystemServer(JNIEnv *env, const lsplant::ScopedLocalRef<jobject> &system_server_binder);
 
         std::tuple<int, size_t> RequestLSPDex(JNIEnv *env, const lsplant::ScopedLocalRef<jobject> &binder);
 

@@ -360,6 +360,22 @@ namespace lspd {
         return app_binder;
     }
 
+    ScopedLocalRef<jobject> Service::RequestLSPosedBinderFromSystemServer(JNIEnv *env, const ScopedLocalRef<jobject> &system_server_binder) {
+        Wrapper wrapper{env, this};
+        JNI_CallVoidMethod(env, wrapper.data, write_interface_token_method_,
+                           JNI_NewStringUTF(env, SYSTEM_SERVER_SERVICE_DESCRIPTOR.data()));
+
+        auto res = wrapper.transact(system_server_binder, REQUEST_LSPOSED_SERVICE_TRANSACTION_CODE);
+
+        ScopedLocalRef<jobject> lsp_binder = {env, nullptr};
+        if (res) {
+            JNI_CallVoidMethod(env, wrapper.reply, read_exception_method_);
+            lsp_binder = JNI_CallObjectMethod(env, wrapper.reply, read_strong_binder_method_);
+        }
+        LOGD("lsp_binder: {}", static_cast<void*>(lsp_binder.get()));
+        return lsp_binder;
+    }
+
     std::tuple<int, size_t> Service::RequestLSPDex(JNIEnv *env, const ScopedLocalRef<jobject> &binder) {
         Wrapper wrapper{env, this};
         bool res = wrapper.transact(binder, DEX_TRANSACTION_CODE);

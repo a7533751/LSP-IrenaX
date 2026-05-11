@@ -25,12 +25,21 @@ import android.os.IBinder;
 import android.os.Process;
 
 import org.lsposed.lspd.service.ILSPApplicationService;
+import org.lsposed.lspd.service.BridgeService;
 import org.lsposed.lspd.util.ParasiticManagerHooker;
 import org.lsposed.lspd.util.ParasiticManagerSystemHooker;
 import org.lsposed.lspd.util.Utils;
 import org.lsposed.lspd.BuildConfig;
 
 public class Main {
+
+    public static void initSystemServerBridge(IBinder binder) {
+        try {
+            BridgeService.receiveSystemServerBinder(binder);
+        } catch (Throwable t) {
+            Utils.logE("failed to initialize system server bridge", t);
+        }
+    }
 
     public static void forkCommon(boolean isSystem, String niceName, String appDir, IBinder binder) {
         if (isSystem) {

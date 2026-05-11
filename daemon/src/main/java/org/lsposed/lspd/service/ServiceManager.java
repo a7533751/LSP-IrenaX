@@ -195,6 +195,10 @@ public class ServiceManager {
         return applicationService;
     }
 
+    public static LSPosedService getMainService() {
+        return mainService;
+    }
+
     public static LSPApplicationService requestApplicationService(int uid, int pid, String processName, IBinder heartBeat) {
         if (applicationService.registerHeartBeat(uid, pid, processName, heartBeat))
             return applicationService;

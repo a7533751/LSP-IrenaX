@@ -113,7 +113,10 @@ namespace lspd {
             ConfigBridge::GetInstance()->obfuscation_map(std::move(obfs_map));
             LoadDex(env, PreloadedDex(dex_fd, size));
             close(dex_fd);
-            instance->HookBridge(*this, env);
+            auto use_direct_system_server_bridge = GetAndroidApiLevel() <= __ANDROID_API_P__;
+            if (!use_direct_system_server_bridge) {
+                instance->HookBridge(*this, env);
+            }
 
             // always inject into system server
             lsplant::InitInfo initInfo{
@@ -134,6 +137,13 @@ namespace lspd {
             InitArtHooker(env, initInfo);
             InitHooks(env);
             SetupEntryClass(env);
+            if (use_direct_system_server_bridge) {
+                LOGI("using direct system server bridge on Android {}", GetAndroidApiLevel());
+                auto lsp_binder = instance->RequestLSPosedBinderFromSystemServer(env, system_server_binder);
+                FindAndCall(env, "initSystemServerBridge",
+                            "(Landroid/os/IBinder;)V",
+                            lsp_binder);
+            }
             FindAndCall(env, "forkCommon",
                         "(ZLjava/lang/String;Ljava/lang/String;Landroid/os/IBinder;)V",
                         JNI_TRUE, JNI_NewStringUTF(env, "system"), nullptr, application_binder, is_parasitic_manager);

@@ -53,6 +53,7 @@ public class ParasiticManagerSystemHooker implements HandleSystemServerProcessHo
     @Override
     public void onSystemServerLoaded(ClassLoader classLoader) {
         try {
+            BridgeService.dispatchSystemServerContext();
             Class<?> supervisorClass;
             try {
                 // 15-12.0

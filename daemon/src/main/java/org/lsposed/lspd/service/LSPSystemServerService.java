@@ -22,6 +22,7 @@ package org.lsposed.lspd.service;
 import static org.lsposed.lspd.service.ServiceManager.TAG;
 import static org.lsposed.lspd.service.ServiceManager.getSystemServiceManager;
 
+import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.IServiceCallback;
@@ -84,6 +85,14 @@ public class LSPSystemServerService extends ILSPSystemServerService.Stub impleme
             return null;
         else
             return ServiceManager.requestApplicationService(uid, pid, processName, heartBeat);
+    }
+
+    @Override
+    public IBinder requestLSPosedService() {
+        Log.d(TAG, "ILSPSystemServerService.requestLSPosedService");
+        requested = 1;
+        if (ConfigManager.getInstance().shouldSkipSystemServer() || Binder.getCallingUid() != 1000) return null;
+        return ServiceManager.getMainService().asBinder();
     }
 
     @Override
