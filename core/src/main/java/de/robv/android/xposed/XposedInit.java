@@ -224,6 +224,10 @@ public final class XposedInit {
     }
 
     public static void loadLegacyModules() {
+        if (serviceClient == null) {
+            Log.w(TAG, "Skipping legacy modules because application service is not ready");
+            return;
+        }
         var moduleList = serviceClient.getLegacyModulesList();
         moduleList.forEach(module -> {
             var apk = module.apkPath;
@@ -237,6 +241,10 @@ public final class XposedInit {
     }
 
     public static void loadModules(ActivityThread at) {
+        if (serviceClient == null) {
+            Log.w(TAG, "Skipping modules because application service is not ready");
+            return;
+        }
         var packages = (ArrayMap<?, ?>) XposedHelpers.getObjectField(at, "mPackages");
         serviceClient.getModulesList().forEach(module -> {
             loadedModules.put(module.packageName, Optional.empty());

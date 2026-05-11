@@ -187,8 +187,9 @@ public final class XSharedPreferences implements SharedPreferences {
             }
             newModule = isModule && (xposedminversion > 92 || xposedsharedprefs);
         }
-        if (newModule) {
-            mFile = new File(serviceClient.getPrefsPath(packageName), prefFileName + ".xml");
+        var prefsPath = serviceClient == null ? null : serviceClient.getPrefsPath(packageName);
+        if (newModule && prefsPath != null) {
+            mFile = new File(prefsPath, prefFileName + ".xml");
         } else {
             mFile = new File(Environment.getDataDirectory(), "data/" + packageName + "/shared_prefs/" + prefFileName + ".xml");
         }
@@ -204,8 +205,12 @@ public final class XSharedPreferences implements SharedPreferences {
         synchronized (sWatcherKeyInstances) {
             Path path = mFile.toPath();
             try {
+                var prefsPath = serviceClient == null ? null : serviceClient.getPrefsPath("");
+                if (prefsPath == null) {
+                    return;
+                }
                 if (sWatcher == null) {
-                    sWatcher = new File(serviceClient.getPrefsPath("")).toPath().getFileSystem().newWatchService();
+                    sWatcher = new File(prefsPath).toPath().getFileSystem().newWatchService();
                     if (BuildConfig.DEBUG) Log.d(TAG, "Created WatchService instance");
                 }
                 mWatchKey = path.getParent().register(sWatcher, StandardWatchEventKinds.ENTRY_CREATE,

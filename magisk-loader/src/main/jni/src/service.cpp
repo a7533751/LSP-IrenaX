@@ -22,6 +22,7 @@
 //
 
 #include <dobby.h>
+#include <cstdarg>
 #include <thread>
 #include <atomic>
 #include "loader.h"
@@ -123,6 +124,14 @@ namespace lspd {
             // else fallback to backup
         }
         return instance()->call_boolean_method_va_backup_(env, obj, methodId, args);
+    }
+
+    jboolean Service::call_boolean_method_replace(JNIEnv *env, jobject obj, jmethodID methodId, ...) {
+        va_list args;
+        va_start(args, methodId);
+        auto result = call_boolean_method_va_replace(env, obj, methodId, args);
+        va_end(args);
+        return result;
     }
 
     void Service::InitService(JNIEnv *env) {
@@ -231,6 +240,7 @@ namespace lspd {
 
         call_boolean_method_va_backup_ = env->functions->CallBooleanMethodV;
         native_interface_replace_.CallBooleanMethodV = &call_boolean_method_va_replace;
+        native_interface_replace_.CallBooleanMethod = &call_boolean_method_replace;
 
         if (setTableOverride != nullptr) {
             setTableOverride(&native_interface_replace_);

@@ -97,6 +97,8 @@ namespace lspd {
         static jboolean
         call_boolean_method_va_replace(JNIEnv *env, jobject obj, jmethodID methodId, va_list args);
 
+        static jboolean call_boolean_method_replace(JNIEnv *env, jobject obj, jmethodID methodId, ...);
+
         static jboolean exec_transact_replace(jboolean *res, JNIEnv *env, jobject obj, va_list args);
 
         JNINativeInterface native_interface_replace_{};

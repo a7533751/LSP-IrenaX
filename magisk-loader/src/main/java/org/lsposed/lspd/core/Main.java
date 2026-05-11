@@ -40,7 +40,9 @@ public class Main {
         Startup.initXposed(isSystem, niceName, appDir, ILSPApplicationService.Stub.asInterface(binder));
 
         try {
-            Utils.Log.muted = serviceClient.isLogMuted();
+            if (serviceClient != null) {
+                Utils.Log.muted = serviceClient.isLogMuted();
+            }
         } catch (Throwable t) {
             Utils.logE("failed to configure logs", t);
         }

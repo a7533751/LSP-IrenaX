@@ -6,3 +6,7 @@
 /build
 /captures
 /key.jks
+LSPosed_logs*.zip
+LSPosed_logs*.tar.gz
+
+shell.txt

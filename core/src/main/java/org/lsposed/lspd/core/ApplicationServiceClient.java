@@ -47,6 +47,9 @@ public class ApplicationServiceClient implements ILSPApplicationService, IBinder
     }
 
     synchronized static void Init(ILSPApplicationService service, String niceName) {
+        if (service == null) {
+            return;
+        }
         var binder = service.asBinder();
         if (serviceClient == null && binder != null) {
             try {

@@ -198,8 +198,12 @@ public class LoadedApkCreateCLHooker implements XposedInterface.Hooker {
             });
             XposedHelpers.findAndHookMethod("android.app.ContextImpl", lpparam.classLoader, "getPreferencesDir", new XC_MethodReplacement() {
                 @Override
-                protected Object replaceHookedMethod(MethodHookParam param) {
-                    return new File(serviceClient.getPrefsPath(lpparam.packageName));
+                protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                    var prefsPath = serviceClient == null ? null : serviceClient.getPrefsPath(lpparam.packageName);
+                    if (prefsPath == null) {
+                        return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
+                    }
+                    return new File(prefsPath);
                 }
             });
         }
