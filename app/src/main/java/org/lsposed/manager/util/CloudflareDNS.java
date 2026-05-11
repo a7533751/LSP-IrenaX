@@ -10,6 +10,8 @@ import java.net.InetAddress;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import okhttp3.ConnectionSpec;
@@ -41,10 +43,10 @@ public final class CloudflareDNS implements Dns {
                 .client(new OkHttpClient.Builder()
                         .cache(App.getOkHttpCache())
                         .sslSocketFactory(new NoSniFactory(), trustManager)
-                        .connectionSpecs(List.of(tls))
+                        .connectionSpecs(Collections.singletonList(tls))
                         .build());
         try {
-            builder.bootstrapDnsHosts(List.of(
+            builder.bootstrapDnsHosts(Arrays.asList(
                     InetAddress.getByName("1.1.1.1"),
                     InetAddress.getByName("1.0.0.1"),
                     InetAddress.getByName("2606:4700:4700::1111"),

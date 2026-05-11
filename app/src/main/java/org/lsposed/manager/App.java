@@ -199,7 +199,7 @@ public class App extends Application {
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction("org.lsposed.manager.NOTIFICATION");
-        registerReceiver(new BroadcastReceiver() {
+        var receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent inIntent) {
                 var intent = (Intent) inIntent.getParcelableExtra(Intent.EXTRA_INTENT);
@@ -220,8 +220,12 @@ public class App extends Application {
                     case ACTION_USER_ADDED, ACTION_USER_REMOVED, ACTION_USER_INFO_CHANGED -> App.getExecutorService().submit(() -> ModuleUtil.getInstance().reloadInstalledModules());
                 }
             }
-            //TODO FIXME
-        }, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+        };
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(receiver, intentFilter);
+        }
 
     }
 

@@ -142,6 +142,9 @@ public class LoadedApkCreateCLHooker implements XposedInterface.Hooker {
                 @NonNull
                 @Override
                 public ClassLoader getDefaultClassLoader() {
+                    if (defaultClassLoaderField == null) {
+                        return classLoader;
+                    }
                     try {
                         return (ClassLoader) defaultClassLoaderField.get(loadedApk);
                     } catch (Throwable t) {

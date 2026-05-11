@@ -371,14 +371,14 @@ public class LSPosedService extends ILSPosedService.Stub {
 
         var uidFilter = new IntentFilter(Intent.ACTION_UID_REMOVED);
 
-        registerReceiver(List.of(packageFilter, uidFilter), -1, this::dispatchPackageChanged);
+        registerReceiver(Arrays.asList(packageFilter, uidFilter), -1, this::dispatchPackageChanged);
         Log.d(TAG, "registered package receiver");
     }
 
     private void registerConfigurationReceiver() {
         var intentFilter = new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED);
 
-        registerReceiver(List.of(intentFilter), 0, this::dispatchConfigurationChanged);
+        registerReceiver(Arrays.asList(intentFilter), 0, this::dispatchConfigurationChanged);
         Log.d(TAG, "registered configuration receiver");
     }
 
@@ -394,7 +394,7 @@ public class LSPosedService extends ILSPosedService.Stub {
         intentFilter.addDataScheme("android_secret_code");
 
         //noinspection InlinedApi
-        registerReceiver(List.of(intentFilter), "android.permission.CONTROL_INCALL_EXPERIENCE",
+        registerReceiver(Arrays.asList(intentFilter), "android.permission.CONTROL_INCALL_EXPERIENCE",
                 0, this::dispatchSecretCodeReceive, Context.RECEIVER_EXPORTED);
         Log.d(TAG, "registered secret code receiver");
     }
@@ -402,7 +402,7 @@ public class LSPosedService extends ILSPosedService.Stub {
     private void registerBootCompleteReceiver() {
         var intentFilter = new IntentFilter(Intent.ACTION_LOCKED_BOOT_COMPLETED);
         intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
-        registerReceiver(List.of(intentFilter), 0, this::dispatchBootCompleted);
+        registerReceiver(Arrays.asList(intentFilter), 0, this::dispatchBootCompleted);
         Log.d(TAG, "registered boot receiver");
     }
 
@@ -411,7 +411,7 @@ public class LSPosedService extends ILSPosedService.Stub {
         userFilter.addAction(ACTION_USER_ADDED);
         userFilter.addAction(ACTION_USER_REMOVED);
 
-        registerReceiver(List.of(userFilter), -1, this::dispatchUserChanged);
+        registerReceiver(Arrays.asList(userFilter), -1, this::dispatchUserChanged);
         Log.d(TAG, "registered user info change receiver");
     }
 
@@ -420,7 +420,7 @@ public class LSPosedService extends ILSPosedService.Stub {
         var moduleFilter = new IntentFilter(intentFilter);
         moduleFilter.addDataScheme("module");
 
-        registerReceiver(List.of(intentFilter, moduleFilter), 0, this::dispatchOpenManager);
+        registerReceiver(Arrays.asList(intentFilter, moduleFilter), 0, this::dispatchOpenManager);
         Log.d(TAG, "registered open manager receiver");
     }
 
@@ -428,7 +428,7 @@ public class LSPosedService extends ILSPosedService.Stub {
         var intentFilter = new IntentFilter(LSPNotificationManager.moduleScope);
         intentFilter.addDataScheme("module");
 
-        registerReceiver(List.of(intentFilter), 0, this::dispatchModuleScope);
+        registerReceiver(Arrays.asList(intentFilter), 0, this::dispatchModuleScope);
         Log.d(TAG, "registered module scope receiver");
     }
 

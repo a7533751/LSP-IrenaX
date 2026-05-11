@@ -138,17 +138,16 @@ if [ "$API" -ge 29 ]; then
   ui_print "- Patching binaries"
   DEV_PATH=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 32)
   sed -i "s/5291374ceda0aef7c5d86cd2a4f6a3ac/$DEV_PATH/g" "$MODPATH/daemon.apk"
-  sed -i "s/5291374ceda0aef7c5d86cd2a4f6a3ac/$DEV_PATH/" "$MODPATH/bin/dex2oat32"
-  sed -i "s/5291374ceda0aef7c5d86cd2a4f6a3ac/$DEV_PATH/" "$MODPATH/bin/dex2oat64"
+  [ -f "$MODPATH/bin/dex2oat32" ] && sed -i "s/5291374ceda0aef7c5d86cd2a4f6a3ac/$DEV_PATH/" "$MODPATH/bin/dex2oat32"
+  [ -f "$MODPATH/bin/dex2oat64" ] && sed -i "s/5291374ceda0aef7c5d86cd2a4f6a3ac/$DEV_PATH/" "$MODPATH/bin/dex2oat64"
 else
-  ui_print "*********************************************************"
-  ui_print "! Cannot support Android version < 10"
-  ui_print "! Please use something else, or really just buy a new phone"
-  abort    "*********************************************************"
+  ui_print "- Android < 10 detected, skip dex2oat wrapper"
+  ui_print "- Add legacy dex2oat flags"
+  echo "dalvik.vm.dex2oat-flags=--inline-max-code-units=0" >> "$MODPATH/system.prop"
 fi
 
 set_perm_recursive "$MODPATH" 0 0 0755 0644
-set_perm_recursive "$MODPATH/bin" 0 2000 0755 0755 u:object_r:lsposed_file:s0
+[ -d "$MODPATH/bin" ] && set_perm_recursive "$MODPATH/bin" 0 2000 0755 0755 u:object_r:lsposed_file:s0
 chmod 0744 "$MODPATH/daemon"
 
 if [ "$(grep_prop ro.maple.enable)" == "1" ]; then

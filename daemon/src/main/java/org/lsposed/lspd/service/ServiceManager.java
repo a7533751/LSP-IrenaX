@@ -44,7 +44,6 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -279,7 +278,7 @@ public class ServiceManager {
             }
             // getSplitPermissions
             if (reply != null && mName.equals("permissionmgr"))
-                reply.writeTypedList(List.of());
+                reply.writeTypedList(java.util.Collections.emptyList());
             return true;
         }
     }

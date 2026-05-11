@@ -106,7 +106,9 @@ public class HomeFragment extends BaseFragment implements MenuProvider {
     private void updateStates(Activity activity, boolean binderAlive) {
         if (binderAlive) {
             binding.updateCard.setVisibility(View.GONE);
-            boolean dex2oatAbnormal = ConfigManager.getDex2OatWrapperCompatibility() != ILSPManagerService.DEX2OAT_OK && !ConfigManager.dex2oatFlagsLoaded();
+            boolean dex2oatAbnormal = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+                    ? !ConfigManager.dex2oatFlagsLoaded()
+                    : ConfigManager.getDex2OatWrapperCompatibility() != ILSPManagerService.DEX2OAT_OK && !ConfigManager.dex2oatFlagsLoaded();
             var sepolicyAbnormal = !ConfigManager.isSepolicyLoaded();
             var systemServerAbnormal = !ConfigManager.systemServerRequested();
             if (sepolicyAbnormal || systemServerAbnormal || dex2oatAbnormal) {
@@ -154,7 +156,11 @@ public class HomeFragment extends BaseFragment implements MenuProvider {
             binding.frameworkVersion.setText(String.format(LocaleDelegate.getDefaultLocale(), "%1$s (%2$d)", ConfigManager.getXposedVersionName(), ConfigManager.getXposedVersionCode()));
             binding.managerPackageName.setText(activity.getPackageName());
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                binding.dex2oatWrapper.setText(String.format(LocaleDelegate.getDefaultLocale(), "%s (%s)", getString(R.string.unsupported), getString(R.string.android_version_unsatisfied)));
+                if (ConfigManager.dex2oatFlagsLoaded()) {
+                    binding.dex2oatWrapper.setText(R.string.supported);
+                } else {
+                    binding.dex2oatWrapper.setText(String.format(LocaleDelegate.getDefaultLocale(), "%s (%s)", getString(R.string.unsupported), getString(R.string.android_version_unsatisfied)));
+                }
             } else switch (ConfigManager.getDex2OatWrapperCompatibility()) {
                 case ILSPManagerService.DEX2OAT_OK ->
                         binding.dex2oatWrapper.setText(R.string.supported);
