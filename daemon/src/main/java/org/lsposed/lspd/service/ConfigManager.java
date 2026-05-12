@@ -347,11 +347,12 @@ public class ConfigManager {
     static ConfigManager getInstance() {
         if (instance == null)
             instance = new ConfigManager();
-        boolean needCached;
+        boolean shouldScheduleCache;
         synchronized (instance.cacheHandler) {
-            needCached = instance.lastModuleCacheTime == 0 || instance.lastScopeCacheTime == 0;
+            shouldScheduleCache = (instance.lastModuleCacheTime == 0 || instance.lastScopeCacheTime == 0)
+                    && !instance.scopeCachePending;
         }
-        if (needCached) {
+        if (shouldScheduleCache) {
             if (PackageService.isAlive() && UserService.isAlive()) {
                 Log.d(TAG, "pm & um are ready, updating cache");
                 instance.updateModuleCacheAndScheduleScopes();
