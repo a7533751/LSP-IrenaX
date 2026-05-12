@@ -39,7 +39,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 public class ActivityManagerService {
     private static IActivityManager am = null;

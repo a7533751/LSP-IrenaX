@@ -1,6 +1,6 @@
 package org.lsposed.lspd.hooker;
 
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.lspd.impl.LSPosedBridge;
 

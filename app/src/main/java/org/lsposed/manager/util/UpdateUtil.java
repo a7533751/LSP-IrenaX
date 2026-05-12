@@ -19,7 +19,7 @@
 
 package org.lsposed.manager.util;
 
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

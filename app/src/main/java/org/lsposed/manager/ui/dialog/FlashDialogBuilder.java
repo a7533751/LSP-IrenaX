@@ -26,7 +26,7 @@ import android.content.DialogInterface;
 import android.graphics.Typeface;
 import android.os.ParcelFileDescriptor;
 import android.text.method.LinkMovementMethod;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;

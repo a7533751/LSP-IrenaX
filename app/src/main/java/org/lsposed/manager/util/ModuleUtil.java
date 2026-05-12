@@ -26,7 +26,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
 import android.text.TextUtils;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

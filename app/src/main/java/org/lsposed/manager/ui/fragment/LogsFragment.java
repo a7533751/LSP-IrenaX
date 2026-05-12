@@ -22,7 +22,7 @@ package org.lsposed.manager.ui.fragment;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.os.Bundle;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;

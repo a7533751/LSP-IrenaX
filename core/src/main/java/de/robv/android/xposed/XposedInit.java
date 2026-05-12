@@ -39,7 +39,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.Process;
 import android.util.ArrayMap;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.lspd.impl.LSPosedContext;
 import org.lsposed.lspd.models.PreLoadedApk;

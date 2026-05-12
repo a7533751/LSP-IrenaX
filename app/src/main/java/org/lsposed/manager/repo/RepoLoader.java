@@ -21,7 +21,7 @@
 package org.lsposed.manager.repo;
 
 import android.content.res.Resources;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

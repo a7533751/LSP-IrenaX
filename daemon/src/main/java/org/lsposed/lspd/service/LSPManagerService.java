@@ -42,7 +42,7 @@ import android.os.SELinux;
 import android.os.SystemProperties;
 import android.system.ErrnoException;
 import android.system.Os;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 import android.view.IWindowManager;
 
 import androidx.annotation.NonNull;

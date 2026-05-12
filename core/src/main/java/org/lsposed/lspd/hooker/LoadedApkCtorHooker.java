@@ -22,7 +22,7 @@ package org.lsposed.lspd.hooker;
 
 import android.app.LoadedApk;
 import android.content.res.XResources;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.lspd.util.Hookers;
 

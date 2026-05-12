@@ -28,7 +28,7 @@ import android.os.IBinder;
 import android.os.IUserManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.lspd.util.Utils;
 

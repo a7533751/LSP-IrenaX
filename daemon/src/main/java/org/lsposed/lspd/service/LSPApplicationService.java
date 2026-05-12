@@ -26,7 +26,7 @@ import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import android.os.RemoteException;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;

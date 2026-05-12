@@ -42,7 +42,7 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.provider.Telephony;
 import android.telephony.TelephonyManager;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.daemon.BuildConfig;
 

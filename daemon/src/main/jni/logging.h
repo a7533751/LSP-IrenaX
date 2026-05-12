@@ -34,6 +34,8 @@
 #define LOGI(...) 0
 #define LOGW(...) 0
 #define LOGE(...) 0
+#define LOGF(...) 0
+#define PLOGE(...) 0
 #else
 #ifndef NDEBUG
 #define LOGD(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "%s:%d#%s" ": " fmt, __FILE_NAME__, __LINE__, __PRETTY_FUNCTION__ __VA_OPT__(,) __VA_ARGS__)

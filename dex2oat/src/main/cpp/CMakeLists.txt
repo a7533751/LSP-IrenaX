@@ -6,8 +6,10 @@ add_library(preload SHARED preload.cpp)
 
 add_subdirectory(${EXTERNAL_ROOT} external/cxx)
 
-target_link_libraries(dex2oat log)
-target_link_libraries(preload log cxx)
+target_compile_definitions(dex2oat PRIVATE LOG_DISABLED)
+target_compile_definitions(preload PRIVATE LOG_DISABLED)
+
+target_link_libraries(preload cxx)
 
 if (DEFINED DEBUG_SYMBOLS_PATH)
     message(STATUS "Debug symbols will be placed at ${DEBUG_SYMBOLS_PATH}")

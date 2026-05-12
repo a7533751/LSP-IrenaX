@@ -33,7 +33,7 @@ import android.os.SELinux;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.system.OsConstants;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
