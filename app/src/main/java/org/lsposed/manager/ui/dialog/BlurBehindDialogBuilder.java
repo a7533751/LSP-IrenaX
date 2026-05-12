@@ -23,7 +23,7 @@ import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Build;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.view.Window;

@@ -22,7 +22,6 @@ package org.lsposed.lspd.util;
 
 import android.os.SystemProperties;
 import android.text.TextUtils;
-import android.util.Log;
 
 import java.time.ZoneId;
 import java.time.ZoneOffset;

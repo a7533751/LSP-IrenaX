@@ -25,7 +25,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.lspd.ILSPManagerService;
 import org.lsposed.lspd.models.Application;

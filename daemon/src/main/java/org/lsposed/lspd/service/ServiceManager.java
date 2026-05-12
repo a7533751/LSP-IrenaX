@@ -30,7 +30,7 @@ import android.os.Looper;
 import android.os.Parcel;
 import android.os.Process;
 import android.os.RemoteException;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

@@ -7,7 +7,7 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.lspd.models.Module;
 

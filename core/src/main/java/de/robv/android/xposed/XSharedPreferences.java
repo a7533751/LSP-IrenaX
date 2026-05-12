@@ -27,7 +27,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Environment;
 import android.preference.PreferenceManager;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import com.android.internal.util.XmlUtils;
 

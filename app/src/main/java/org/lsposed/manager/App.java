@@ -22,29 +22,24 @@ package org.lsposed.manager;
 
 import android.app.Application;
 import android.content.BroadcastReceiver;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Build;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
-import android.provider.MediaStore;
 import android.provider.Settings;
-import android.system.Os;
 import android.text.TextUtils;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.preference.PreferenceManager;
 
 import org.lsposed.hiddenapibypass.HiddenApiBypass;
+import org.lsposed.lspd.util.Log;
 import org.lsposed.manager.adapters.AppHelper;
-import org.lsposed.manager.receivers.LSPManagerServiceHolder;
 import org.lsposed.manager.repo.RepoLoader;
 import org.lsposed.manager.util.CloudflareDNS;
 import org.lsposed.manager.util.ModuleUtil;
@@ -54,9 +49,7 @@ import org.lsposed.manager.util.UpdateUtil;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
-import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -64,7 +57,6 @@ import java.util.concurrent.FutureTask;
 
 import okhttp3.Cache;
 import okhttp3.OkHttpClient;
-import okhttp3.logging.HttpLoggingInterceptor;
 import rikka.core.os.FileUtils;
 import rikka.material.app.LocaleDelegate;
 
@@ -141,38 +133,6 @@ public class App extends Application {
     }
 
     private void setCrashReport() {
-        var handler = Thread.getDefaultUncaughtExceptionHandler();
-        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-            var time = OffsetDateTime.now();
-            var dir = new File(getCacheDir(), "crash");
-            //noinspection ResultOfMethodCallIgnored
-            dir.mkdir();
-            var file = new File(dir, time.toEpochSecond() + ".log");
-            try (var pw = new PrintWriter(file)) {
-                pw.println(BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")");
-                pw.println(time);
-                pw.println("pid: " + Os.getpid() + " uid: " + Os.getuid());
-                throwable.printStackTrace(pw);
-            } catch (IOException ignored) {
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                var table = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-                var values = new ContentValues();
-                values.put(MediaStore.Downloads.DISPLAY_NAME, "LSPosed_crash_report" + time.toEpochSecond() + ".zip");
-                values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS);
-                var cr = getContentResolver();
-                var uri = cr.insert(table, values);
-                if (uri == null) return;
-                try (var zipFd = cr.openFileDescriptor(uri, "wt")) {
-                    LSPManagerServiceHolder.getService().getLogs(zipFd);
-                } catch (Exception ignored) {
-                    cr.delete(uri, null, null);
-                }
-            }
-            if (handler != null) {
-                handler.uncaughtException(thread, throwable);
-            }
-        });
     }
 
     @Override
@@ -233,11 +193,6 @@ public class App extends Application {
         var builder = new OkHttpClient.Builder()
             .cache(getOkHttpCache())
             .dns(new CloudflareDNS());
-        if (BuildConfig.DEBUG) {
-            var log = new HttpLoggingInterceptor();
-            log.setLevel(HttpLoggingInterceptor.Level.HEADERS);
-            builder.addInterceptor(log);
-        }
         okHttpClient = builder.build();
         return okHttpClient;
     }

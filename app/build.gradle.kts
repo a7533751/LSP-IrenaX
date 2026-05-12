@@ -139,7 +139,6 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.okhttp)
     implementation(libs.okhttp.dnsoverhttps)
-    implementation(libs.okhttp.logging.interceptor)
     implementation(libs.rikkax.appcompat)
     implementation(libs.rikkax.core)
     implementation(libs.rikkax.insets)

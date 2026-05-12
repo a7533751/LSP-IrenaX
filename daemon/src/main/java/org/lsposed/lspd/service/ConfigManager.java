@@ -45,7 +45,7 @@ import android.os.SharedMemory;
 import android.os.SystemClock;
 import android.system.ErrnoException;
 import android.system.Os;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;
@@ -263,9 +263,7 @@ public class ConfigManager {
     private synchronized void updateConfig() {
         Map<String, Object> config = getModulePrefs("lspd", 0, "config");
 
-        Object bool = config.get("enable_verbose_log");
-        verboseLog = bool == null || (boolean) bool;
-        bool = config.get("enable_dex_obfuscate");
+        Object bool = config.get("enable_dex_obfuscate");
         dexObfuscate = bool == null || (boolean) bool;
 
         bool = config.get("enable_status_notification");
@@ -998,19 +996,12 @@ public class ConfigManager {
     }
 
     public void setVerboseLog(boolean on) {
-        if (BuildConfig.DEBUG) return;
-        var logcatService = ServiceManager.getLogcatService();
-        if (on) {
-            logcatService.startVerbose();
-        } else {
-            logcatService.stopVerbose();
-        }
-        updateModulePrefs("lspd", 0, "config", "enable_verbose_log", on);
-        verboseLog = on;
+        updateModulePrefs("lspd", 0, "config", "enable_verbose_log", false);
+        verboseLog = false;
     }
 
     public boolean verboseLog() {
-        return BuildConfig.DEBUG || verboseLog;
+        return false;
     }
 
     public void setDexObfuscate(boolean on) {

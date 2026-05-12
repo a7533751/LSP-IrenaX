@@ -23,7 +23,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.daemon.R;
 import org.lsposed.lspd.util.FakeContext;

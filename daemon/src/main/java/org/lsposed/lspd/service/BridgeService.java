@@ -10,7 +10,7 @@ import android.os.Parcel;
 import android.os.ServiceManager;
 import android.system.ErrnoException;
 import android.system.Os;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.daemon.BuildConfig;
 

@@ -1,6 +1,6 @@
 package org.lsposed.lspd.impl;
 
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import androidx.annotation.NonNull;
 

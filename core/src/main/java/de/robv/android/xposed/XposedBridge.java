@@ -23,7 +23,7 @@ package de.robv.android.xposed;
 import android.app.ActivityThread;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import org.lsposed.lspd.impl.LSPosedBridge;
 import org.lsposed.lspd.impl.LSPosedHookCallback;

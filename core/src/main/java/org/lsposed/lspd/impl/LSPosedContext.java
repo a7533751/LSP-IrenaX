@@ -9,7 +9,7 @@ import android.os.DeadSystemException;
 import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import android.os.RemoteException;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;

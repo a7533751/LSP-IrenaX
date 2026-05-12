@@ -5,7 +5,6 @@ import android.app.ProfilerInfo;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ResolveInfo;
-import android.util.Log;
 
 import org.lsposed.lspd.hooker.HandleSystemServerProcessHooker;
 import org.lsposed.lspd.impl.LSPosedHelper;

@@ -5,15 +5,15 @@ add_subdirectory(${EXTERNAL_ROOT} external)
 
 set(SOURCES
         dex2oat.cpp
-        logcat.cpp
         obfuscation.cpp
         )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(${PROJECT_NAME} PRIVATE LOG_DISABLED)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE lsplant_static dex_builder_static android log)
+target_link_libraries(${PROJECT_NAME} PRIVATE lsplant_static dex_builder_static android)
 
 if (DEFINED DEBUG_SYMBOLS_PATH)
     message(STATUS "Debug symbols will be placed at ${DEBUG_SYMBOLS_PATH}")

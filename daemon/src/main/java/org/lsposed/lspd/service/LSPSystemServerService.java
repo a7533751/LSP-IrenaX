@@ -28,7 +28,7 @@ import android.os.IServiceCallback;
 import android.os.Parcel;
 import android.os.RemoteException;
 import android.os.SystemProperties;
-import android.util.Log;
+import org.lsposed.lspd.util.Log;
 
 public class LSPSystemServerService extends ILSPSystemServerService.Stub implements IBinder.DeathRecipient {
 
