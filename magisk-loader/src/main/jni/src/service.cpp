@@ -263,7 +263,7 @@ namespace lspd {
         IPCThreadState::Init(binder.get());
         lspd::GetLibBinder(true);
 
-        LOGD("Done InitService");
+        LOGI("Done InitService");
     }
 
     ScopedLocalRef<jobject> Service::RequestBinder(JNIEnv *env, jstring nice_name) {

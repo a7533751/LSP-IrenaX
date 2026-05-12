@@ -51,10 +51,14 @@ namespace lspd {
     static constexpr uid_t kAidInjected = INJECTED_AID;
     static constexpr uid_t kAidInet = 3003;
 
-    static constexpr std::array<std::string_view, 3> kAndroid9BypassedSystemServerArtHooks{
+    static constexpr std::array<std::string_view, 7> kAndroid9BypassedSystemServerArtHooks{
             "_ZN3art6mirror5Class9SetStatusENS_6HandleIS1_EENS_11ClassStatusEPNS_6ThreadE",
             "_ZN3art6mirror5Class9SetStatusENS_6HandleIS1_EENS1_6StatusEPNS_6ThreadE",
             "_ZN3art6mirror5Class9SetStatusENS1_6StatusEPNS_6ThreadE",
+            "_ZN3art3jit3Jit27EnqueueOptimizedCompilationEPNS_9ArtMethodEPNS_6ThreadE",
+            "_ZN3art3jit3Jit14AddCompileTaskEPNS_6ThreadEPNS_9ArtMethodENS_15CompilationKindEb",
+            "_ZN3art3jit12JitCodeCache19GarbageCollectCacheEPNS_6ThreadE",
+            "_ZN3art3jit12JitCodeCache12DoCollectionEPNS_6ThreadE",
     };
 
     bool ShouldBypassAndroid9SystemServerArtHook(std::string_view symbol) {
@@ -124,13 +128,16 @@ namespace lspd {
 
     void
     MagiskLoader::OnNativeForkSystemServerPre(JNIEnv *env) {
+        LOGI("system_server pre-specialize start on Android {}", GetAndroidApiLevel());
         Service::instance()->InitService(env);
         setAllowUnload(skip_);
+        LOGI("system_server pre-specialize done");
     }
 
     void
     MagiskLoader::OnNativeForkSystemServerPost(JNIEnv *env) {
         if (!skip_) {
+            LOGI("system_server post-specialize start on Android {}", GetAndroidApiLevel());
             auto *instance = Service::instance();
             auto system_server_binder = instance->RequestSystemServerBinder(env);
             if (!system_server_binder) {
@@ -149,6 +156,7 @@ namespace lspd {
             LoadDex(env, PreloadedDex(dex_fd, size));
             close(dex_fd);
             auto use_direct_system_server_bridge = GetAndroidApiLevel() <= __ANDROID_API_P__;
+            LOGI("system_server dex loaded, direct_bridge={}", BoolToString(use_direct_system_server_bridge));
             if (!use_direct_system_server_bridge) {
                 instance->HookBridge(*this, env);
             }
@@ -181,18 +189,31 @@ namespace lspd {
                 },
             };
             InitArtHooker(env, initInfo);
+            LOGI("system_server lsplant init done");
             InitHooks(env);
+            LOGI("system_server native bridge init done");
             SetupEntryClass(env);
+            LOGI("system_server entry class ready");
             if (use_direct_system_server_bridge) {
                 LOGI("using direct system server bridge on Android {}", GetAndroidApiLevel());
                 auto lsp_binder = instance->RequestLSPosedBinderFromSystemServer(env, system_server_binder);
-                FindAndCall(env, "initSystemServerBridge",
-                            "(Landroid/os/IBinder;)V",
-                            lsp_binder);
+                if (lsp_binder) {
+                    FindAndCall(env, "initSystemServerBridge",
+                                "(Landroid/os/IBinder;)V",
+                                lsp_binder);
+                } else {
+                    LOGW("skip Android 9 direct system bridge: LSPosed binder is null");
+                }
+            }
+            if (!application_binder) {
+                LOGW("skip system server xposed bootstrap: application binder is null");
+                return;
             }
             FindAndCall(env, "forkCommon",
                         "(ZLjava/lang/String;Ljava/lang/String;Landroid/os/IBinder;)V",
-                        JNI_TRUE, JNI_NewStringUTF(env, "system"), nullptr, application_binder, is_parasitic_manager);
+                        JNI_TRUE, JNI_NewStringUTF(env, "system"),
+                        JNI_NewStringUTF(env, "system"), application_binder);
+            LOGI("system_server forkCommon done");
             GetArt(true);
         }
     }
