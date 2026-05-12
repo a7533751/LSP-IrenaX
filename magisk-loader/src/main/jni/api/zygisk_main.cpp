@@ -92,6 +92,8 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
             int cfd = api_->connectCompanion();
             if (cfd < 0) {
                 LOGE("Failed to connect to companion: {}", strerror(errno));
+                should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
                 return;
             }
 
@@ -101,6 +103,7 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
 
                 close(cfd);
                 should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
 
                 return;
             }
@@ -118,6 +121,7 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
                 env_->ReleaseStringUTFChars(args->nice_name, name);
                 close(cfd);
                 should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
 
                 return;
             }
@@ -130,6 +134,7 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
                 env_->ReleaseStringUTFChars(args->nice_name, name);
                 close(cfd);
                 should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
 
                 return;
             }
@@ -140,6 +145,7 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
                 env_->ReleaseStringUTFChars(args->nice_name, name);
                 close(cfd);
                 should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
 
                 return;
             }
@@ -322,8 +328,6 @@ void relsposed_companion(int lib_fd) {
     CLEAN_EXIT();
   }
   
-  LOGD("Received request for package '{}'", name.c_str());
-  
   int32_t user_id = 0;
   if (lspd::read_all(lib_fd, &user_id, sizeof(user_id)) != sizeof(user_id)) {
     LOGE("Failed to read user id from companion socket: {}", strerror(errno));
@@ -331,11 +335,11 @@ void relsposed_companion(int lib_fd) {
     CLEAN_EXIT();
   }
   
-  LOGD("Checking if package '{}' (user_id={}) is targeted by any module", name.c_str(), user_id);
-  
   bool targeted = is_targeted_by_any_module(name.c_str(), user_id);
   uint8_t targeted_b = targeted ? 1 : 0;
-  LOGD("Package '{}' (user_id={}) is {}targeted by any module", name.c_str(), user_id, targeted ? "" : "not ");
+  if (targeted) {
+    LOGD("Package '{}' (user_id={}) is targeted by any module", name.c_str(), user_id);
+  }
   if (lspd::write_all(lib_fd, &targeted_b, sizeof(targeted_b)) < 0) {
     LOGE("Failed to write to companion socket: {}", strerror(errno));
   }

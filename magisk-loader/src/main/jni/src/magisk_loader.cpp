@@ -153,8 +153,9 @@ namespace lspd {
     void
     MagiskLoader::OnNativeForkSystemServerPre(JNIEnv *env) {
         LOGI("system_server pre-specialize start on Android {}", GetAndroidApiLevel());
+        skip_ = false;
         Service::instance()->InitService(env);
-        setAllowUnload(skip_);
+        setAllowUnload(false);
         LOGI("system_server pre-specialize done");
     }
 

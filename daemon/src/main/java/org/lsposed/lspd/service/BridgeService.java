@@ -3,6 +3,7 @@ package org.lsposed.lspd.service;
 import static org.lsposed.lspd.service.ServiceManager.TAG;
 
 import android.app.ActivityManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -41,6 +42,12 @@ public class BridgeService {
 
     private static Listener listener;
     private static IBinder bridgeService;
+
+    private static boolean isDirectSystemServerBridgeReady() {
+        return Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+                && org.lsposed.lspd.service.ServiceManager.systemServerRequested();
+    }
+
     private static final IBinder.DeathRecipient bridgeRecipient = new IBinder.DeathRecipient() {
 
         @Override
@@ -150,6 +157,12 @@ public class BridgeService {
                 }
 
                 if (res) break;
+
+                if (isDirectSystemServerBridgeReady()) {
+                    Log.i(TAG, "system server direct bridge is already connected");
+                    res = true;
+                    break;
+                }
 
                 Log.w(TAG, "no response from bridge, retry in 1s");
 
