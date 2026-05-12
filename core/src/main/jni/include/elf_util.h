@@ -49,6 +49,17 @@ namespace SandHook {
 
         template<typename T = void*>
         requires(std::is_pointer_v<T>)
+        constexpr const T getSymbAddressNoBias(std::string_view name) const {
+            auto offset = getSymbOffset(name, GnuHash(name), ElfHash(name));
+            if (offset > 0 && base != nullptr) {
+                return reinterpret_cast<T>(static_cast<ElfW(Addr)>((uintptr_t) base + offset));
+            } else {
+                return nullptr;
+            }
+        }
+
+        template<typename T = void*>
+        requires(std::is_pointer_v<T>)
         constexpr const T getSymbPrefixFirstAddress(std::string_view prefix) const {
             auto offset = PrefixLookupFirst(prefix);
             if (offset > 0 && base != nullptr) {

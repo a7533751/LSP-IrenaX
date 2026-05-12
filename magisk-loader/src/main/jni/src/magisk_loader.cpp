@@ -69,24 +69,47 @@ namespace lspd {
         return false;
     }
 
+    bool ShouldResolveAndroid9ArtObjectWithoutBias(std::string_view symbol) {
+        return symbol == "_ZN3art7Runtime9instance_E";
+    }
+
     struct Android9SystemServerArtHookState {
         void *target = nullptr;
         bool enabled = false;
+        bool resolve_object_without_bias = false;
         bool bypass = false;
     };
 
     void RecordAndroid9SystemServerArtHook(Android9SystemServerArtHookState &state,
                                            std::string_view symbol, void *target) {
         auto enabled = state.enabled;
+        auto resolve_object_without_bias = state.resolve_object_without_bias;
         state = {
                 .target = target,
                 .enabled = enabled,
+                .resolve_object_without_bias = resolve_object_without_bias,
                 .bypass = enabled && target != nullptr &&
                           ShouldBypassAndroid9SystemServerArtHook(symbol),
         };
         if (state.bypass) {
             LOGW("bypass Android 9 system_server art inline hook symbol {}", symbol);
         }
+    }
+
+    void *ResolveAndroid9ArtSymbol(std::string_view symbol,
+                                   Android9SystemServerArtHookState &state) {
+        auto target = GetArt()->getSymbAddress(symbol);
+        if (state.resolve_object_without_bias && target != nullptr &&
+            ShouldResolveAndroid9ArtObjectWithoutBias(symbol)) {
+            auto no_bias_target = GetArt()->getSymbAddressNoBias(symbol);
+            if (no_bias_target != nullptr && no_bias_target != target) {
+                LOGW("resolve Android 9 art object symbol {} without bias: {} -> {}",
+                     symbol, target, no_bias_target);
+                target = no_bias_target;
+            }
+        }
+        RecordAndroid9SystemServerArtHook(state, symbol, target);
+        return target;
     }
 
     void MagiskLoader::LoadDex(JNIEnv *env, PreloadedDex &&dex) {
@@ -166,6 +189,8 @@ namespace lspd {
             Android9SystemServerArtHookState android9_art_hook_state{
                     .enabled = use_direct_system_server_bridge &&
                                GetAndroidApiLevel() == __ANDROID_API_P__,
+                    .resolve_object_without_bias =
+                            GetAndroidApiLevel() == __ANDROID_API_P__,
             };
             lsplant::InitInfo initInfo{
                 .inline_hooker = [&android9_art_hook_state](auto t, auto r) {
@@ -179,9 +204,7 @@ namespace lspd {
                     return UnhookFunction(t) == RT_SUCCESS ;
                 },
                 .art_symbol_resolver = [&android9_art_hook_state](auto symbol) {
-                    auto target = GetArt()->getSymbAddress(symbol);
-                    RecordAndroid9SystemServerArtHook(android9_art_hook_state, symbol, target);
-                    return target;
+                    return ResolveAndroid9ArtSymbol(symbol, android9_art_hook_state);
                 },
                 .art_symbol_prefix_resolver = [&android9_art_hook_state](auto symbol) {
                     auto target = GetArt()->getSymbPrefixFirstAddress(symbol);
@@ -273,6 +296,10 @@ namespace lspd {
         auto binder = skip_ ? ScopedLocalRef<jobject>{env, nullptr}
                             : instance->RequestBinder(env, nice_name);
         if (binder) {
+            Android9SystemServerArtHookState android9_art_hook_state{
+                    .resolve_object_without_bias =
+                            GetAndroidApiLevel() == __ANDROID_API_P__,
+            };
             lsplant::InitInfo initInfo{
                     .inline_hooker = [](auto t, auto r) {
                         void* bk = nullptr;
@@ -281,8 +308,8 @@ namespace lspd {
                     .inline_unhooker = [](auto t) {
                         return UnhookFunction(t) == RT_SUCCESS;
                     },
-                    .art_symbol_resolver = [](auto symbol){
-                        return GetArt()->getSymbAddress(symbol);
+                    .art_symbol_resolver = [&android9_art_hook_state](auto symbol){
+                        return ResolveAndroid9ArtSymbol(symbol, android9_art_hook_state);
                     },
                     .art_symbol_prefix_resolver = [](auto symbol) {
                         return GetArt()->getSymbPrefixFirstAddress(symbol);
