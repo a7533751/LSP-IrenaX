@@ -213,6 +213,16 @@ public class PackageService {
         return new Pair<>(fetchProcesses(pkgInfo), pkgInfo.applicationInfo.uid);
     }
 
+    public static Set<String> getPackagesForUid(int uid) throws RemoteException {
+        IPackageManager pm = getPackageManager();
+        if (pm == null) return Collections.emptySet();
+        String[] packages = pm.getPackagesForUid(uid);
+        if (packages == null || packages.length == 0) return Collections.emptySet();
+        var result = new HashSet<String>();
+        Collections.addAll(result, packages);
+        return result;
+    }
+
     public static boolean isPackageAvailable(String packageName, int userId, boolean ignoreHidden) throws RemoteException {
         return pm.isPackageAvailable(packageName, userId) || (ignoreHidden && pm.getApplicationHiddenSettingAsUser(packageName, userId));
     }

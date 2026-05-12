@@ -652,11 +652,12 @@ public class ConfigManager {
     private synchronized void cacheScopes() {
         // skip caching when pm is not yet available
         if (!PackageService.isAlive()) return;
+        long requestedCacheTime;
         synchronized (cacheHandler) {
             if (lastScopeCacheTime >= requestScopeCacheTime) return;
-            else lastScopeCacheTime = SystemClock.elapsedRealtime();
+            else requestedCacheTime = requestScopeCacheTime;
         }
-        cachedScope.clear();
+        Map<ProcessScope, List<Module>> nextCachedScope = new ConcurrentHashMap<>();
         try (Cursor cursor = db.query("scope INNER JOIN modules ON scope.mid = modules.mid", new String[]{"app_pkg_name", "module_pkg_name", "user_id"},
                 "enabled = 1", null, null, null, null)) {
             int appPkgNameIdx = cursor.getColumnIndex("app_pkg_name");
@@ -712,7 +713,7 @@ public class ConfigManager {
                     var module = cachedModule.get(modulePackageName);
                     assert module != null;
                     for (ProcessScope processScope : processesScope) {
-                        cachedScope.computeIfAbsent(processScope,
+                        nextCachedScope.computeIfAbsent(processScope,
                                 ignored -> new LinkedList<>()).add(module);
                         // Always allow the module to inject itself
                         if (modulePackageName.equals(app.packageName)) {
@@ -721,7 +722,7 @@ public class ConfigManager {
                                 var moduleUid = user.id * PER_USER_RANGE + appId;
                                 if (moduleUid == processScope.uid) continue; // skip duplicate
                                 var moduleSelf = new ProcessScope(processScope.processName, moduleUid);
-                                cachedScope.computeIfAbsent(moduleSelf,
+                                nextCachedScope.computeIfAbsent(moduleSelf,
                                         ignored -> new LinkedList<>()).add(module);
                             }
                         }
@@ -746,6 +747,11 @@ public class ConfigManager {
                 return;
             }
         }
+        cachedScope.clear();
+        cachedScope.putAll(nextCachedScope);
+        synchronized (cacheHandler) {
+            lastScopeCacheTime = Math.max(lastScopeCacheTime, requestedCacheTime);
+        }
         Log.d(TAG, "cached scope");
         cachedScope.forEach((ps, modules) -> {
             Log.d(TAG, ps.processName + "/" + ps.uid);
@@ -753,17 +759,50 @@ public class ConfigManager {
         });
     }
 
-    // This is called when a new process created, use the cached result
-    public List<Module> getModulesForProcess(String processName, int uid) {
-        return isManager(uid) ? Collections.emptyList() : cachedScope.getOrDefault(new ProcessScope(processName, uid), Collections.emptyList());
+    private List<Module> getModulesForScopeFromDatabase(String processName, int uid) {
+        int userId = uid / PER_USER_RANGE;
+        Set<String> packageNames = new HashSet<>();
+        packageNames.add(processName);
+        try {
+            packageNames.addAll(PackageService.getPackagesForUid(uid));
+        } catch (RemoteException e) {
+            Log.w(TAG, "get packages for uid " + uid, e);
+        }
+        List<Module> modules = new LinkedList<>();
+        for (String packageName : packageNames) {
+            try (Cursor cursor = db.query("scope INNER JOIN modules ON scope.mid = modules.mid", new String[]{"module_pkg_name"},
+                    "app_pkg_name = ? AND user_id = ? AND enabled = 1",
+                    new String[]{packageName, String.valueOf(userId)}, null, null, null)) {
+                if (cursor == null) continue;
+                int modulePkgNameIdx = cursor.getColumnIndex("module_pkg_name");
+                while (cursor.moveToNext()) {
+                    var module = cachedModule.get(cursor.getString(modulePkgNameIdx));
+                    if (module != null && !modules.contains(module)) modules.add(module);
+                }
+            }
+        }
+        return modules;
     }
 
     // This is called when a new process created, use the cached result
-    public boolean shouldSkipProcess(ProcessScope scope) {
-        return !cachedScope.containsKey(scope) && !isManager(scope.uid);
+    public synchronized List<Module> getModulesForProcess(String processName, int uid) {
+        if (isManager(uid)) return Collections.emptyList();
+        var scope = new ProcessScope(processName, uid);
+        var modules = cachedScope.get(scope);
+        if (modules != null) return modules;
+        modules = getModulesForScopeFromDatabase(processName, uid);
+        if (!modules.isEmpty()) {
+            cachedScope.put(scope, modules);
+        }
+        return modules;
     }
 
-    public boolean isUidHooked(int uid) {
+    // This is called when a new process created, use the cached result
+    public synchronized boolean shouldSkipProcess(ProcessScope scope) {
+        return getModulesForProcess(scope.processName, scope.uid).isEmpty() && !isManager(scope.uid);
+    }
+
+    public synchronized boolean isUidHooked(int uid) {
         return cachedScope.keySet().stream().reduce(false, (p, scope) -> p || scope.uid == uid, Boolean::logicalOr);
     }
 
