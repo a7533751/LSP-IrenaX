@@ -22,10 +22,12 @@ package org.lsposed.lspd.core;
 import static org.lsposed.lspd.core.ApplicationServiceClient.serviceClient;
 
 import android.os.IBinder;
+import android.os.Build;
 import android.os.Process;
 
 import org.lsposed.lspd.service.ILSPApplicationService;
 import org.lsposed.lspd.service.BridgeService;
+import org.lsposed.lspd.service.DirectActivityBridgeHooker;
 import org.lsposed.lspd.util.ParasiticManagerHooker;
 import org.lsposed.lspd.util.ParasiticManagerSystemHooker;
 import org.lsposed.lspd.util.Utils;
@@ -36,6 +38,9 @@ public class Main {
     public static void initSystemServerBridge(IBinder binder) {
         try {
             BridgeService.receiveSystemServerBinder(binder);
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                DirectActivityBridgeHooker.start();
+            }
         } catch (Throwable t) {
             Utils.logE("failed to initialize system server bridge", t);
         }
