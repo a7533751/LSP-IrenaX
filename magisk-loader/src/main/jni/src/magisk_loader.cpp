@@ -219,9 +219,23 @@ namespace lspd {
             LOGI("system_server native bridge init done");
             SetupEntryClass(env);
             LOGI("system_server entry class ready");
+            auto lsp_binder = use_direct_system_server_bridge
+                    ? instance->RequestLSPosedBinderFromSystemServer(env, system_server_binder)
+                    : ScopedLocalRef<jobject>{env, nullptr};
+            if (!application_binder) {
+                LOGW("skip system server xposed bootstrap: application binder is null");
+                if (use_direct_system_server_bridge && lsp_binder) {
+                    FindAndCall(env, "initSystemServerManagerBridge",
+                                "(Landroid/os/IBinder;)V",
+                                lsp_binder);
+                    LOGI("system_server manager bridge initialized without application binder");
+                } else if (use_direct_system_server_bridge) {
+                    LOGW("skip Android 9 manager bridge: LSPosed binder is null");
+                }
+                return;
+            }
             if (use_direct_system_server_bridge) {
                 LOGI("using direct system server bridge on Android {}", GetAndroidApiLevel());
-                auto lsp_binder = instance->RequestLSPosedBinderFromSystemServer(env, system_server_binder);
                 if (lsp_binder) {
                     FindAndCall(env, "initSystemServerBridge",
                                 "(Landroid/os/IBinder;)V",
@@ -229,10 +243,6 @@ namespace lspd {
                 } else {
                     LOGW("skip Android 9 direct system bridge: LSPosed binder is null");
                 }
-            }
-            if (!application_binder) {
-                LOGW("skip system server xposed bootstrap: application binder is null");
-                return;
             }
             FindAndCall(env, "forkCommon",
                         "(ZLjava/lang/String;Ljava/lang/String;Landroid/os/IBinder;)V",

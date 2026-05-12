@@ -46,6 +46,16 @@ public class Main {
         }
     }
 
+    public static void initSystemServerManagerBridge(IBinder binder) {
+        try {
+            initSystemServerBridge(binder);
+            ParasiticManagerSystemHooker.start();
+            Startup.bootstrapSystemServerManager();
+        } catch (Throwable t) {
+            Utils.logE("failed to initialize system server manager bridge", t);
+        }
+    }
+
     public static void forkCommon(boolean isSystem, String niceName, String appDir, IBinder binder) {
         if (isSystem) {
             ParasiticManagerSystemHooker.start();

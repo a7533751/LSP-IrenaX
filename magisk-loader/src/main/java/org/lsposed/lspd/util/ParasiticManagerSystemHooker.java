@@ -11,10 +11,14 @@ import org.lsposed.lspd.impl.LSPosedHelper;
 import org.lsposed.lspd.service.BridgeService;
 import org.lsposed.lspd.util.Utils;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import io.github.libxposed.api.XposedInterface;
 
 
 public class ParasiticManagerSystemHooker implements HandleSystemServerProcessHooker.Callback {
+    private static final AtomicBoolean started = new AtomicBoolean(false);
+
     public static void start() {
         HandleSystemServerProcessHooker.callback = new ParasiticManagerSystemHooker();
     }
@@ -44,7 +48,8 @@ public class ParasiticManagerSystemHooker implements HandleSystemServerProcessHo
             aInfo.theme = android.R.style.Theme_DeviceDefault_Settings;
             // remove some annoying flags
             aInfo.flags = aInfo.flags & ~(ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS | ActivityInfo.FLAG_FINISH_ON_CLOSE_SYSTEM_DIALOGS);
-            BridgeService.getService().preStartManager();
+            var service = BridgeService.getService();
+            if (service == null || !service.preStartManager()) return;
             callback.setResult(aInfo);
         }
     }
@@ -52,6 +57,7 @@ public class ParasiticManagerSystemHooker implements HandleSystemServerProcessHo
     @SuppressLint("PrivateApi")
     @Override
     public void onSystemServerLoaded(ClassLoader classLoader) {
+        if (!started.compareAndSet(false, true)) return;
         try {
             BridgeService.dispatchSystemServerContext();
             Class<?> supervisorClass;

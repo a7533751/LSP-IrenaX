@@ -32,6 +32,7 @@ import org.lsposed.hiddenapibypass.LSPass;
 import org.lsposed.lspd.deopt.PrebuiltMethodsDeopter;
 import org.lsposed.lspd.hooker.AttachHooker;
 import org.lsposed.lspd.hooker.CrashDumpHooker;
+import org.lsposed.lspd.hooker.HandleSystemServerManagerHooker;
 import org.lsposed.lspd.hooker.HandleSystemServerProcessHooker;
 import org.lsposed.lspd.hooker.LoadedApkCtorHooker;
 import org.lsposed.lspd.hooker.LoadedApkCreateCLHooker;
@@ -76,6 +77,19 @@ public class Startup {
             XposedInit.loadLegacyModules();
         } catch (Throwable t) {
             Utils.logE("error during Xposed initialization", t);
+        }
+    }
+
+    public static void bootstrapSystemServerManager() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            LSPass.setHiddenApiExemptions("L");
+        }
+
+        try {
+            LSPosedHelper.hookAllMethods(HandleSystemServerManagerHooker.class, ZygoteInit.class, "handleSystemServerProcess");
+            Utils.logI("Installed system server manager bootstrap hook");
+        } catch (Throwable t) {
+            Utils.logE("error during system server manager bootstrap", t);
         }
     }
 
