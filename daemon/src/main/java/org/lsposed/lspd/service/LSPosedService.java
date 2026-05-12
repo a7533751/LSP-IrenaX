@@ -246,17 +246,16 @@ public class LSPosedService extends ILSPosedService.Stub {
 
     private void dispatchBootCompleted(Intent intent) {
         bootCompleted = true;
-        var configManager = ConfigManager.getInstance();
-        if (configManager.enableStatusNotification()) {
-            LSPNotificationManager.notifyStatusNotification();
-        } else {
-            LSPNotificationManager.cancelStatusNotification();
-        }
+        updateStatusNotification();
     }
 
     private void dispatchConfigurationChanged(Intent intent) {
         if (!bootCompleted) return;
         ConfigFileManager.reloadConfiguration();
+        updateStatusNotification();
+    }
+
+    private void updateStatusNotification() {
         var configManager = ConfigManager.getInstance();
         if (configManager.enableStatusNotification()) {
             LSPNotificationManager.notifyStatusNotification();
@@ -479,6 +478,7 @@ public class LSPosedService extends ILSPosedService.Stub {
         registerOpenManagerReceiver();
         registerModuleScopeReceiver();
         registerUidObserver();
+        updateStatusNotification();
     }
 
     @Override

@@ -113,6 +113,7 @@ public class ConfigManager {
 
     private long lastScopeCacheTime = 0;
     private long requestScopeCacheTime = 0;
+    private boolean scopeCachePending = false;
 
     private String api = "(???)";
 
@@ -197,10 +198,30 @@ public class ConfigManager {
             requestScopeCacheTime = requestModuleCacheTime = SystemClock.elapsedRealtime();
         }
         if (sync) {
-            cacheModules();
+            cacheModules(true);
         } else {
-            cacheHandler.post(this::cacheModules);
+            cacheHandler.post(() -> cacheModules(true));
         }
+    }
+
+    private void updateModuleCacheAndScheduleScopes() {
+        synchronized (cacheHandler) {
+            requestScopeCacheTime = requestModuleCacheTime = SystemClock.elapsedRealtime();
+        }
+        cacheModules(false);
+        synchronized (cacheHandler) {
+            if (scopeCachePending) return;
+            scopeCachePending = true;
+        }
+        cacheHandler.post(() -> {
+            try {
+                cacheScopes();
+            } finally {
+                synchronized (cacheHandler) {
+                    scopeCachePending = false;
+                }
+            }
+        });
     }
 
     // for system server, cache is not yet ready, we need to query database for it
@@ -333,8 +354,7 @@ public class ConfigManager {
         if (needCached) {
             if (PackageService.isAlive() && UserService.isAlive()) {
                 Log.d(TAG, "pm & um are ready, updating cache");
-                // must ensure cache is valid for later usage
-                instance.updateCaches(true);
+                instance.updateModuleCacheAndScheduleScopes();
                 instance.updateManager(false);
             }
         }
@@ -348,8 +368,7 @@ public class ConfigManager {
 
         initDB();
         updateConfig();
-        // must ensure cache is valid for later usage
-        updateCaches(true);
+        updateModuleCacheAndScheduleScopes();
     }
 
 
@@ -544,7 +563,7 @@ public class ConfigManager {
         cachedScope.clear();
     }
 
-    private synchronized void cacheModules() {
+    private synchronized void cacheModules(boolean includeScopes) {
         // skip caching when pm is not yet available
         if (!PackageService.isAlive() || !UserService.isAlive()) return;
         synchronized (cacheHandler) {
@@ -645,7 +664,7 @@ public class ConfigManager {
         for (var module : cachedModule.entrySet()) {
             Log.d(TAG, module.getKey() + " " + module.getValue().apkPath);
         }
-        cacheScopes();
+        if (includeScopes) cacheScopes();
         toClose.forEach(SharedMemory::close);
     }
 
@@ -785,7 +804,7 @@ public class ConfigManager {
     }
 
     // This is called when a new process created, use the cached result
-    public synchronized List<Module> getModulesForProcess(String processName, int uid) {
+    public List<Module> getModulesForProcess(String processName, int uid) {
         if (isManager(uid)) return Collections.emptyList();
         var scope = new ProcessScope(processName, uid);
         var modules = cachedScope.get(scope);
@@ -798,7 +817,7 @@ public class ConfigManager {
     }
 
     // This is called when a new process created, use the cached result
-    public synchronized boolean shouldSkipProcess(ProcessScope scope) {
+    public boolean shouldSkipProcess(ProcessScope scope) {
         return getModulesForProcess(scope.processName, scope.uid).isEmpty() && !isManager(scope.uid);
     }
 
