@@ -63,11 +63,11 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
 
     int allow_unload = 0;
     int *allowUnload = &allow_unload;
-    bool should_ignore = false;
 
     class ZygiskModule : public zygisk::ModuleBase {
         JNIEnv *env_;
         zygisk::Api *api_;
+        bool should_ignore_ = false;
 
         void onLoad(zygisk::Api *api, JNIEnv *env) override {
             env_ = env;
@@ -77,21 +77,32 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
         }
 
         void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
+            should_ignore_ = false;
+            allow_unload = 0;
+            if (args->is_child_zygote && *args->is_child_zygote) {
+                should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+                return;
+            }
+            if (!args->app_data_dir) {
+                should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+                return;
+            }
             int cfd = api_->connectCompanion();
             if (cfd < 0) {
                 LOGE("Failed to connect to companion: {}", strerror(errno));
                 return;
             }
 
-            uint8_t is_targeted = 1;
-	    const char *name = env_->GetStringUTFChars(args->nice_name, nullptr);
-	    if (!name) {
-		LOGE("Failed to get process name");
+            const char *name = env_->GetStringUTFChars(args->nice_name, nullptr);
+            if (!name) {
+                LOGE("Failed to get process name");
 
-		close(cfd);
-		should_ignore = true;
+                close(cfd);
+                should_ignore_ = true;
 
-		return;
+                return;
             }
 
             uint8_t req_type = 1;
@@ -99,41 +110,42 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
             int32_t scope_user_id = static_cast<int32_t>(args->uid / 100000);
 
             if (write_all(cfd, &req_type, sizeof(req_type)) < 0 ||
-            	write_all(cfd, &name_len, sizeof(name_len)) < 0 ||
-            	write_all(cfd, name, name_len) != static_cast<ssize_t>(name_len) ||
-            	write_all(cfd, &scope_user_id, sizeof(scope_user_id)) < 0) {
-            	LOGE("Failed to write to companion socket: {}", strerror(errno));
+                write_all(cfd, &name_len, sizeof(name_len)) < 0 ||
+                write_all(cfd, name, name_len) != static_cast<ssize_t>(name_len) ||
+                write_all(cfd, &scope_user_id, sizeof(scope_user_id)) < 0) {
+                LOGE("Failed to write to companion socket: {}", strerror(errno));
             
-            	close(cfd);
-            	should_ignore = true;
+                env_->ReleaseStringUTFChars(args->nice_name, name);
+                close(cfd);
+                should_ignore_ = true;
 
-            	return;
+                return;
             }
             // Read single-byte response: is_targeted
             uint8_t target_byte = 1;
             ssize_t r = read_all(cfd, &target_byte, sizeof(target_byte));
             if (r <= 0) {
-            	LOGE("Failed to read is_targeted from companion socket: {}", strerror(errno));
-
-            	close(cfd);
-            	should_ignore = true;
-
-            	return;
-            }
-
-	    is_targeted = target_byte;
-
-            if (!is_targeted && strcmp(name, "com.android.shell") != 0 && strcmp(name, "org.lsposed.manager") != 0) {
-            	LOGD("Process {} is not targeted by any module, skipping injection", name);
+                LOGE("Failed to read is_targeted from companion socket: {}", strerror(errno));
 
                 env_->ReleaseStringUTFChars(args->nice_name, name);
-		close(cfd);
-                should_ignore = true;
+                close(cfd);
+                should_ignore_ = true;
 
                 return;
             }
 
-	    close(cfd);
+            uint8_t is_targeted = target_byte;
+
+            if (!is_targeted && strcmp(name, "com.android.shell") != 0 && strcmp(name, "org.lsposed.manager") != 0) {
+                env_->ReleaseStringUTFChars(args->nice_name, name);
+                close(cfd);
+                should_ignore_ = true;
+
+                return;
+            }
+
+            close(cfd);
+            env_->ReleaseStringUTFChars(args->nice_name, name);
 
             MagiskLoader::GetInstance()->OnNativeForkAndSpecializePre(
             	env_, args->uid, args->gids, args->nice_name,
@@ -141,8 +153,7 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
         }
 
         void postAppSpecialize(const zygisk::AppSpecializeArgs *args) override {
-            if (should_ignore) {
-                LOGD("Ignoring postAppSpecialize due to earlier skip (process not targeted)");
+            if (should_ignore_) {
                 api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
                 return;
             }
@@ -152,10 +163,14 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
         }
 
         void preServerSpecialize([[maybe_unused]] zygisk::ServerSpecializeArgs *args) override {
+            should_ignore_ = false;
+            allow_unload = 0;
+            LOGD("zygisk system_server pre callback");
             MagiskLoader::GetInstance()->OnNativeForkSystemServerPre(env_);
         }
 
         void postServerSpecialize([[maybe_unused]] const zygisk::ServerSpecializeArgs *args) override {
+            LOGD("zygisk system_server post callback");
             if (__system_property_find("ro.vendor.product.ztename")) {
                 auto *process = env_->FindClass("android/os/Process");
                 auto *set_argv0 = env_->GetStaticMethodID(process, "setArgV0",
