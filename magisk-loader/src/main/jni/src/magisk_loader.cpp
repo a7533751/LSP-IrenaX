@@ -51,10 +51,11 @@ namespace lspd {
     static constexpr uid_t kAidInjected = INJECTED_AID;
     static constexpr uid_t kAidInet = 3003;
 
-    static constexpr std::array<std::string_view, 7> kAndroid9BypassedSystemServerArtHooks{
+    static constexpr std::array<std::string_view, 8> kAndroid9BypassedSystemServerArtHooks{
             "_ZN3art6mirror5Class9SetStatusENS_6HandleIS1_EENS_11ClassStatusEPNS_6ThreadE",
             "_ZN3art6mirror5Class9SetStatusENS_6HandleIS1_EENS1_6StatusEPNS_6ThreadE",
             "_ZN3art6mirror5Class9SetStatusENS1_6StatusEPNS_6ThreadE",
+            "_ZN3art7Runtime20SetRuntimeDebugStateENS0_17RuntimeDebugStateE",
             "_ZN3art3jit3Jit27EnqueueOptimizedCompilationEPNS_9ArtMethodEPNS_6ThreadE",
             "_ZN3art3jit3Jit14AddCompileTaskEPNS_6ThreadEPNS_9ArtMethodENS_15CompilationKindEb",
             "_ZN3art3jit12JitCodeCache19GarbageCollectCacheEPNS_6ThreadE",
