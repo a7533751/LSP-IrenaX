@@ -41,7 +41,7 @@ namespace SandHook {
         constexpr const T getSymbAddress(std::string_view name) const {
             auto offset = getSymbOffset(name, GnuHash(name), ElfHash(name));
             if (offset > 0 && base != nullptr) {
-                return reinterpret_cast<T>(static_cast<ElfW(Addr)>((uintptr_t) base + offset - bias));
+                return reinterpret_cast<T>(runtimeAddress(offset));
             } else {
                 return nullptr;
             }
@@ -63,7 +63,7 @@ namespace SandHook {
         constexpr const T getSymbPrefixFirstAddress(std::string_view prefix) const {
             auto offset = PrefixLookupFirst(prefix);
             if (offset > 0 && base != nullptr) {
-                return reinterpret_cast<T>(static_cast<ElfW(Addr)>((uintptr_t) base + offset - bias));
+                return reinterpret_cast<T>(runtimeAddress(offset));
             } else {
                 return nullptr;
             }
@@ -76,7 +76,7 @@ namespace SandHook {
             std::vector<T> res;
             res.reserve(offsets.size());
             for (const auto &offset : offsets) {
-                res.emplace_back(reinterpret_cast<T>(static_cast<ElfW(Addr)>((uintptr_t) base + offset - bias)));
+                res.emplace_back(reinterpret_cast<T>(runtimeAddress(offset)));
             }
             return res;
         }
@@ -116,11 +116,18 @@ namespace SandHook {
 
         bool xzdecompress();
 
+        constexpr ElfW(Addr) runtimeAddress(ElfW(Addr) offset) const {
+            const auto address_bias = base_is_load_bias || bias == kUnsetBias ? 0 : bias;
+            return static_cast<ElfW(Addr)>((uintptr_t) base + offset - address_bias);
+        }
+
+        constexpr static off_t kUnsetBias = -4396;
         std::string elf;
         void *base = nullptr;
+        bool base_is_load_bias = false;
         char *buffer = nullptr;
         off_t size = 0;
-        off_t bias = -4396;
+        off_t bias = kUnsetBias;
         ElfW(Ehdr) *header = nullptr;
         ElfW(Ehdr) *header_debugdata = nullptr;
         ElfW(Shdr) *section_header = nullptr;

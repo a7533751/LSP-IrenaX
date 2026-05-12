@@ -82,7 +82,7 @@ void ElfImg::parse(ElfW(Ehdr) *hdr)
         auto entsize = section_h->sh_entsize;
         switch (section_h->sh_type) {
             case SHT_DYNSYM: {
-                if (bias == -4396) {
+                if (bias == kUnsetBias) {
                     dynsym = section_h;
                     dynsym_offset = section_h->sh_offset;
                     dynsym_start = offsetOf<decltype(dynsym_start)>(hdr, dynsym_offset);
@@ -102,7 +102,7 @@ void ElfImg::parse(ElfW(Ehdr) *hdr)
                 break;
             }
             case SHT_STRTAB: {
-                if (bias == -4396) {
+                if (bias == kUnsetBias) {
                     strtab = section_h;
                     symstr_offset = section_h->sh_offset;
                     strtab_start = offsetOf<decltype(strtab_start)>(hdr, symstr_offset);
@@ -120,7 +120,7 @@ void ElfImg::parse(ElfW(Ehdr) *hdr)
                     LOGD("gnu_debugdata header {:#x} size {}", section_h->sh_offset, section_h->sh_size);
                 }
                 if (strtab == nullptr || dynsym == nullptr) break;
-                if (bias == -4396) {
+                if (bias == kUnsetBias) {
                     bias = (off_t) section_h->sh_addr - (off_t) section_h->sh_offset;
                 }
                 break;
@@ -401,6 +401,7 @@ bool ElfImg::findModuleBase() {
 
     if (data.base_address != 0) {
         base = reinterpret_cast<void *>(data.base_address);
+        base_is_load_bias = true;
         elf = data.target_path;
 
         LOGD("get module base {}: {:#x} via dl_iterate_phdr", elf, data.base_address);
