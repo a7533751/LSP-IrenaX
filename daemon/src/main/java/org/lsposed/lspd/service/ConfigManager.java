@@ -196,6 +196,17 @@ public class ConfigManager {
         }
     }
 
+    private void updateScopeCache(boolean sync) {
+        synchronized (cacheHandler) {
+            requestScopeCacheTime = SystemClock.elapsedRealtime();
+        }
+        if (sync) {
+            cacheScopes();
+        } else {
+            cacheHandler.post(this::cacheScopes);
+        }
+    }
+
     // for system server, cache is not yet ready, we need to query database for it
     public boolean shouldSkipSystemServer() {
         if (!SELinux.checkSELinuxAccess("u:r:system_server:s0", "u:r:system_server:s0", "process", "execmem")) {
@@ -846,7 +857,7 @@ public class ConfigManager {
             }
         });
         // Called by manager, should be async
-        updateCaches(false);
+        updateScopeCache(false);
         return true;
     }
 
@@ -863,7 +874,7 @@ public class ConfigManager {
             db.insertWithOnConflict("scope", null, values, SQLiteDatabase.CONFLICT_IGNORE);
         });
         // Called by xposed service, should be async
-        updateCaches(false);
+        updateScopeCache(false);
         return true;
     }
 
@@ -876,7 +887,7 @@ public class ConfigManager {
             db.delete("scope", "mid = ? AND app_pkg_name = ? AND user_id = ?", new String[]{String.valueOf(mid), scopePackageName, String.valueOf(userId)});
         });
         // Called by xposed service, should be async
-        updateCaches(false);
+        updateScopeCache(false);
         return true;
     }
 
@@ -904,7 +915,8 @@ public class ConfigManager {
             // Called only when the application is completely uninstalled
             // If it's a module we need to return as soon as possible to broadcast to the manager
             // for updating the module status
-            updateCaches(false);
+            cachedModule.remove(packageName);
+            updateScopeCache(false);
             return true;
         }
         return false;
@@ -951,7 +963,8 @@ public class ConfigManager {
         });
         if (changed) {
             // called by manager, should be async
-            updateCaches(false);
+            cachedModule.remove(packageName);
+            updateScopeCache(false);
             return true;
         } else {
             return false;

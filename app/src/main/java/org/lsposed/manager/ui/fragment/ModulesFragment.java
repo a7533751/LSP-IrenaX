@@ -233,33 +233,36 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
 
     @Override
     public void onModulesReloaded() {
-        var users = moduleUtil.getUsers();
-        if (users == null) return;
+        runOnUiThread(() -> {
+            if (binding == null || pagerAdapter == null) return;
+            var users = moduleUtil.getUsers();
+            if (users == null) return;
 
-        if (users.size() != 1) {
-            binding.viewPager.setUserInputEnabled(true);
-            binding.tabLayout.setVisibility(View.VISIBLE);
-            binding.fab.show();
-        } else {
-            binding.viewPager.setUserInputEnabled(false);
-            binding.tabLayout.setVisibility(View.GONE);
-        }
-
-        var tmp = new SparseArray<ModuleAdapter>(users.size());
-        var snapshot = adapters;
-        for (var user : users) {
-            if (snapshot.indexOfKey(user.id) >= 0) {
-                tmp.put(user.id, snapshot.get(user.id));
+            if (users.size() != 1) {
+                binding.viewPager.setUserInputEnabled(true);
+                binding.tabLayout.setVisibility(View.VISIBLE);
+                binding.fab.show();
             } else {
-                var adapter = new ModuleAdapter(user);
-                adapter.setHasStableIds(true);
-                tmp.put(user.id, adapter);
+                binding.viewPager.setUserInputEnabled(false);
+                binding.tabLayout.setVisibility(View.GONE);
             }
-        }
-        adapters = tmp;
-        forEachAdaptor(ModuleAdapter::refresh);
-        runOnUiThread(pagerAdapter::notifyDataSetChanged);
-        updateModuleSummary();
+
+            var tmp = new SparseArray<ModuleAdapter>(users.size());
+            var snapshot = adapters;
+            for (var user : users) {
+                if (snapshot.indexOfKey(user.id) >= 0) {
+                    tmp.put(user.id, snapshot.get(user.id));
+                } else {
+                    var adapter = new ModuleAdapter(user);
+                    adapter.setHasStableIds(true);
+                    tmp.put(user.id, adapter);
+                }
+            }
+            adapters = tmp;
+            forEachAdaptor(ModuleAdapter::refresh);
+            pagerAdapter.notifyDataSetChanged();
+            updateModuleSummary();
+        });
     }
 
     @Override
@@ -395,6 +398,9 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
             int userId = arguments.getInt("user_id");
             binding = SwiperefreshRecyclerviewBinding.inflate(getLayoutInflater(), container, false);
             adapter = fragment.adapters.get(userId);
+            if (adapter == null) {
+                return binding.getRoot();
+            }
             binding.recyclerView.setAdapter(adapter);
             binding.recyclerView.setLayoutManager(new LinearLayoutManager(requireActivity()));
             binding.swipeRefreshLayout.setOnRefreshListener(adapter::fullRefresh);
@@ -405,8 +411,11 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
         }
 
         void attachListeners() {
+            if (binding == null || adapter == null) return;
             var parent = getParentFragment();
-            if (parent instanceof ModulesFragment moduleFragment) {
+            if (parent instanceof ModulesFragment moduleFragment
+                    && moduleFragment.binding != null
+                    && moduleFragment.searchView != null) {
                 binding.recyclerView.getBorderViewDelegate().setBorderVisibilityChangedListener((top, oldTop, bottom, oldBottom) -> moduleFragment.binding.appBar.setLifted(!top));
                 moduleFragment.binding.appBar.setLifted(!binding.recyclerView.getBorderViewDelegate().isShowingTopBorder());
                 moduleFragment.searchView.addOnAttachStateChangeListener(searchViewLocker);
@@ -423,9 +432,10 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
         }
 
         void detachListeners() {
+            if (binding == null) return;
             binding.recyclerView.getBorderViewDelegate().setBorderVisibilityChangedListener(null);
             var parent = getParentFragment();
-            if (parent instanceof ModulesFragment moduleFragment) {
+            if (parent instanceof ModulesFragment moduleFragment && moduleFragment.searchView != null) {
                 moduleFragment.searchView.removeOnAttachStateChangeListener(searchViewLocker);
                 binding.recyclerView.setNestedScrollingEnabled(true);
             }
@@ -445,7 +455,9 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
 
         @Override
         public void onDestroyView() {
-            adapter.unregisterAdapterDataObserver(observer);
+            if (adapter != null) {
+                adapter.unregisterAdapterDataObserver(observer);
+            }
             super.onDestroyView();
         }
 

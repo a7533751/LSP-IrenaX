@@ -146,7 +146,7 @@ public class RepoLoader {
             OnlineModule[] repoModules = gson.fromJson(bodyString, OnlineModule[].class);
             Arrays.stream(repoModules).forEach(onlineModule -> modules.put(onlineModule.getName(), onlineModule));
             var channel = App.getPreferences().getString("update_channel", channels[0]);
-            updateLatestVersion(repoModules, channel);
+            updateLatestVersion(repoModules, channel, false);
             onlineModules = modules;
         } catch (Throwable t) {
             Log.e(App.TAG, Log.getStackTraceString(t));
@@ -163,6 +163,10 @@ public class RepoLoader {
     }
 
     synchronized private void updateLatestVersion(OnlineModule[] onlineModules, String channel) {
+        updateLatestVersion(onlineModules, channel, true);
+    }
+
+    synchronized private void updateLatestVersion(OnlineModule[] onlineModules, String channel, boolean notify) {
         repoLoaded = false;
         Map<String, ModuleVersion> versions = new ConcurrentHashMap<>();
         for (var module : onlineModules) {
@@ -191,8 +195,10 @@ public class RepoLoader {
         }
         latestVersion = versions;
         repoLoaded = true;
-        for (RepoListener listener : listeners) {
-            listener.onRepoLoaded();
+        if (notify) {
+            for (RepoListener listener : listeners) {
+                listener.onRepoLoaded();
+            }
         }
     }
 
