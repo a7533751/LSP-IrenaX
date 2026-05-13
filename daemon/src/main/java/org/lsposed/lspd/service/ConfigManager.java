@@ -205,14 +205,16 @@ public class ConfigManager {
     }
 
     private void updateModuleCacheAndScheduleScopes() {
+        boolean scheduleScopes;
         synchronized (cacheHandler) {
             requestScopeCacheTime = requestModuleCacheTime = SystemClock.elapsedRealtime();
+            scheduleScopes = !scopeCachePending;
+            if (scheduleScopes) {
+                scopeCachePending = true;
+            }
         }
         cacheModules(false);
-        synchronized (cacheHandler) {
-            if (scopeCachePending) return;
-            scopeCachePending = true;
-        }
+        if (!scheduleScopes) return;
         cacheHandler.post(() -> {
             try {
                 cacheScopes();
@@ -347,11 +349,12 @@ public class ConfigManager {
     static ConfigManager getInstance() {
         if (instance == null)
             instance = new ConfigManager();
-        boolean needCached;
+        boolean shouldScheduleCache;
         synchronized (instance.cacheHandler) {
-            needCached = instance.lastModuleCacheTime == 0 || instance.lastScopeCacheTime == 0;
+            shouldScheduleCache = (instance.lastModuleCacheTime == 0 || instance.lastScopeCacheTime == 0)
+                    && !instance.scopeCachePending;
         }
-        if (needCached) {
+        if (shouldScheduleCache) {
             if (PackageService.isAlive() && UserService.isAlive()) {
                 Log.d(TAG, "pm & um are ready, updating cache");
                 instance.updateModuleCacheAndScheduleScopes();
