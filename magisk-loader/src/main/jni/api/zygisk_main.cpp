@@ -22,8 +22,6 @@
 #include <dlfcn.h>
 #include <sys/mman.h>
 #include <mutex>
-#include <string>
-#include <string_view>
 
 #include "zygisk.h"
 #include "logging.h"
@@ -31,9 +29,6 @@
 #include "config_impl.h"
 #include "magisk_loader.h"
 #include "symbol_cache.h"
-#include "utils.h"
-
-static bool is_targeted_by_any_module(const char *package_name, int user_id);
 
 namespace lspd {
 
@@ -66,43 +61,6 @@ static ssize_t read_all(int fd, void *buf, size_t count) {
     return (ssize_t)read_bytes;
 }
 
-static constexpr int PER_USER_RANGE = 100000;
-static constexpr uid_t kAidInjected = INJECTED_AID;
-
-static bool is_manager_process(uid_t uid, std::string_view name) {
-    return uid == kAidInjected && name == "org.lsposed.manager";
-}
-
-static bool is_shell_process(std::string_view name) {
-    return name == "com.android.shell";
-}
-
-static std::string package_name_from_app_data_dir(std::string_view app_data_dir) {
-    const auto last_separator = app_data_dir.rfind('/');
-    if (last_separator == std::string_view::npos || last_separator + 1 >= app_data_dir.size()) {
-        return {};
-    }
-    return std::string(app_data_dir.substr(last_separator + 1));
-}
-
-static bool should_bypass_native_prefilter(uid_t uid, std::string_view name) {
-    if (is_shell_process(name) || is_manager_process(uid, name)) return true;
-    return GetAndroidApiLevel() <= __ANDROID_API_P__;
-}
-
-static bool is_process_targeted_by_any_module(std::string_view process_name,
-                                              std::string_view package_name,
-                                              int user_id) {
-    if (!package_name.empty() && ::is_targeted_by_any_module(package_name.data(), user_id)) {
-        return true;
-    }
-    if (!process_name.empty() && process_name != package_name &&
-        ::is_targeted_by_any_module(process_name.data(), user_id)) {
-        return true;
-    }
-    return false;
-}
-
     int allow_unload = 0;
     int *allowUnload = &allow_unload;
 
@@ -131,61 +89,68 @@ static bool is_process_targeted_by_any_module(std::string_view process_name,
                 api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
                 return;
             }
+            int cfd = api_->connectCompanion();
+            if (cfd < 0) {
+                LOGE("Failed to connect to companion: {}", strerror(errno));
+                should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+                return;
+            }
 
             const char *name = env_->GetStringUTFChars(args->nice_name, nullptr);
             if (!name) {
                 LOGE("Failed to get process name");
 
+                close(cfd);
                 should_ignore_ = true;
                 api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
 
                 return;
             }
 
-            if (!should_bypass_native_prefilter(args->uid, name)) {
-                int cfd = api_->connectCompanion();
-                if (cfd < 0) {
-                    LOGW("Failed to connect to companion, falling back to daemon filter: {}", strerror(errno));
-                } else {
-                    const char *app_data_dir = env_->GetStringUTFChars(args->app_data_dir, nullptr);
-                    std::string package_name = app_data_dir ?
-                            package_name_from_app_data_dir(app_data_dir) : std::string{};
-                    if (app_data_dir) {
-                        env_->ReleaseStringUTFChars(args->app_data_dir, app_data_dir);
-                    }
+            uint8_t req_type = 1;
+            uint32_t name_len = (uint32_t)strlen(name);
+            int32_t scope_user_id = static_cast<int32_t>(args->uid / 100000);
 
-                    uint8_t req_type = 1;
-                    uint32_t process_name_len = (uint32_t)strlen(name);
-                    uint32_t package_name_len = (uint32_t)package_name.size();
-                    int32_t scope_user_id = static_cast<int32_t>(args->uid / PER_USER_RANGE);
+            if (write_all(cfd, &req_type, sizeof(req_type)) < 0 ||
+                write_all(cfd, &name_len, sizeof(name_len)) < 0 ||
+                write_all(cfd, name, name_len) != static_cast<ssize_t>(name_len) ||
+                write_all(cfd, &scope_user_id, sizeof(scope_user_id)) < 0) {
+                LOGE("Failed to write to companion socket: {}", strerror(errno));
+            
+                env_->ReleaseStringUTFChars(args->nice_name, name);
+                close(cfd);
+                should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
 
-                    if (write_all(cfd, &req_type, sizeof(req_type)) < 0 ||
-                        write_all(cfd, &process_name_len, sizeof(process_name_len)) < 0 ||
-                        write_all(cfd, name, process_name_len) != static_cast<ssize_t>(process_name_len) ||
-                        write_all(cfd, &package_name_len, sizeof(package_name_len)) < 0 ||
-                        (package_name_len > 0 &&
-                         write_all(cfd, package_name.data(), package_name_len) != static_cast<ssize_t>(package_name_len)) ||
-                        write_all(cfd, &scope_user_id, sizeof(scope_user_id)) < 0) {
-                        LOGW("Failed to write to companion socket, falling back to daemon filter: {}", strerror(errno));
-                    } else {
-                        uint8_t target_byte = 1;
-                        ssize_t r = read_all(cfd, &target_byte, sizeof(target_byte));
-                        if (r <= 0) {
-                            LOGW("Failed to read is_targeted from companion socket, falling back to daemon filter: {}", strerror(errno));
-                        } else if (!target_byte) {
-                            env_->ReleaseStringUTFChars(args->nice_name, name);
-                            close(cfd);
-                            should_ignore_ = true;
-                            api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+                return;
+            }
+            // Read single-byte response: is_targeted
+            uint8_t target_byte = 1;
+            ssize_t r = read_all(cfd, &target_byte, sizeof(target_byte));
+            if (r <= 0) {
+                LOGE("Failed to read is_targeted from companion socket: {}", strerror(errno));
 
-                            return;
-                        }
-                    }
+                env_->ReleaseStringUTFChars(args->nice_name, name);
+                close(cfd);
+                should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
 
-                    close(cfd);
-                }
+                return;
             }
 
+            uint8_t is_targeted = target_byte;
+
+            if (!is_targeted && strcmp(name, "com.android.shell") != 0 && strcmp(name, "org.lsposed.manager") != 0) {
+                env_->ReleaseStringUTFChars(args->nice_name, name);
+                close(cfd);
+                should_ignore_ = true;
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+
+                return;
+            }
+
+            close(cfd);
             env_->ReleaseStringUTFChars(args->nice_name, name);
 
             MagiskLoader::GetInstance()->OnNativeForkAndSpecializePre(
@@ -362,28 +327,6 @@ void relsposed_companion(int lib_fd) {
 
     CLEAN_EXIT();
   }
-
-  uint32_t package_name_len = 0;
-  if (lspd::read_all(lib_fd, &package_name_len, sizeof(package_name_len)) != sizeof(package_name_len)) {
-    LOGE("Failed to read package name length from companion socket: {}", strerror(errno));
-
-    CLEAN_EXIT();
-  }
-
-  if (package_name_len > 4096) {
-    LOGE("Invalid package name length: %u", package_name_len);
-
-    CLEAN_EXIT();
-  }
-
-  std::string package_name;
-  package_name.resize(package_name_len);
-  if (package_name_len > 0 &&
-      lspd::read_all(lib_fd, &package_name[0], package_name_len) != package_name_len) {
-    LOGE("Failed to read package name from companion socket: {}", strerror(errno));
-
-    CLEAN_EXIT();
-  }
   
   int32_t user_id = 0;
   if (lspd::read_all(lib_fd, &user_id, sizeof(user_id)) != sizeof(user_id)) {
@@ -392,11 +335,10 @@ void relsposed_companion(int lib_fd) {
     CLEAN_EXIT();
   }
   
-  bool targeted = lspd::is_process_targeted_by_any_module(name, package_name, user_id);
+  bool targeted = is_targeted_by_any_module(name.c_str(), user_id);
   uint8_t targeted_b = targeted ? 1 : 0;
   if (targeted) {
-    LOGD("Process '{}' package '{}' (user_id={}) is targeted by any module",
-         name.c_str(), package_name.c_str(), user_id);
+    LOGD("Package '{}' (user_id={}) is targeted by any module", name.c_str(), user_id);
   }
   if (lspd::write_all(lib_fd, &targeted_b, sizeof(targeted_b)) < 0) {
     LOGE("Failed to write to companion socket: {}", strerror(errno));
