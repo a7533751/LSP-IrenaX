@@ -30,6 +30,7 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -233,6 +234,12 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
 
     @Override
     public void onModulesReloaded() {
+        if (App.getMainHandler().getLooper() != Looper.myLooper()) {
+            runOnUiThread(this::onModulesReloaded);
+            return;
+        }
+        if (binding == null) return;
+
         var users = moduleUtil.getUsers();
         if (users == null) return;
 
@@ -258,7 +265,7 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
         }
         adapters = tmp;
         forEachAdaptor(ModuleAdapter::refresh);
-        runOnUiThread(pagerAdapter::notifyDataSetChanged);
+        pagerAdapter.notifyDataSetChanged();
         updateModuleSummary();
     }
 
@@ -404,6 +411,7 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
         private final RecyclerView.AdapterDataObserver observer = new RecyclerView.AdapterDataObserver() {
             @Override
             public void onChanged() {
+                if (binding == null || adapter == null) return;
                 binding.swipeRefreshLayout.setRefreshing(!adapter.isLoaded());
             }
         };
@@ -431,6 +439,9 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
             int userId = arguments.getInt("user_id");
             binding = SwiperefreshRecyclerviewBinding.inflate(getLayoutInflater(), container, false);
             adapter = fragment.adapters.get(userId);
+            if (adapter == null) {
+                return binding.getRoot();
+            }
             binding.recyclerView.setAdapter(adapter);
             binding.recyclerView.setLayoutManager(new LinearLayoutManager(requireActivity()));
             binding.swipeRefreshLayout.setOnRefreshListener(adapter::fullRefresh);
@@ -441,8 +452,11 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
         }
 
         void attachListeners() {
+            if (binding == null || adapter == null) return;
             var parent = getParentFragment();
-            if (parent instanceof ModulesFragment moduleFragment) {
+            if (parent instanceof ModulesFragment moduleFragment
+                    && moduleFragment.binding != null
+                    && moduleFragment.searchView != null) {
                 binding.recyclerView.getBorderViewDelegate().setBorderVisibilityChangedListener((top, oldTop, bottom, oldBottom) -> moduleFragment.binding.appBar.setLifted(!top));
                 moduleFragment.binding.appBar.setLifted(!binding.recyclerView.getBorderViewDelegate().isShowingTopBorder());
                 moduleFragment.searchView.addOnAttachStateChangeListener(searchViewLocker);
@@ -459,9 +473,10 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
         }
 
         void detachListeners() {
+            if (binding == null) return;
             binding.recyclerView.getBorderViewDelegate().setBorderVisibilityChangedListener(null);
             var parent = getParentFragment();
-            if (parent instanceof ModulesFragment moduleFragment) {
+            if (parent instanceof ModulesFragment moduleFragment && moduleFragment.searchView != null) {
                 moduleFragment.searchView.removeOnAttachStateChangeListener(searchViewLocker);
                 binding.recyclerView.setNestedScrollingEnabled(true);
             }
@@ -481,7 +496,9 @@ public class ModulesFragment extends BaseFragment implements ModuleUtil.ModuleLi
 
         @Override
         public void onDestroyView() {
-            adapter.unregisterAdapterDataObserver(observer);
+            if (adapter != null) {
+                adapter.unregisterAdapterDataObserver(observer);
+            }
             super.onDestroyView();
         }
 
