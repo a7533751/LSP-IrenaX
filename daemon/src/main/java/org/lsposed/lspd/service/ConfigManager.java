@@ -215,6 +215,14 @@ public class ConfigManager {
         }
     }
 
+    private boolean shouldQueryScopeDatabase() {
+        synchronized (cacheHandler) {
+            return lastScopeCacheTime == 0
+                    || lastScopeCacheTime < requestScopeCacheTime
+                    || scopeCachePending;
+        }
+    }
+
     private void updateModuleCacheAndScheduleScopes() {
         boolean scheduleScopes;
         synchronized (cacheHandler) {
@@ -823,6 +831,7 @@ public class ConfigManager {
         var scope = new ProcessScope(processName, uid);
         var modules = cachedScope.get(scope);
         if (modules != null) return modules;
+        if (!shouldQueryScopeDatabase()) return Collections.emptyList();
         modules = getModulesForScopeFromDatabase(processName, uid);
         if (!modules.isEmpty()) {
             cachedScope.put(scope, modules);
