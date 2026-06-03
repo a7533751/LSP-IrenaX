@@ -76,6 +76,7 @@ public class RepoLoader {
     private final Path repoFile = Paths.get(App.getInstance().getFilesDir().getAbsolutePath(), "repo.json");
     private final Set<RepoListener> listeners = ConcurrentHashMap.newKeySet();
     private boolean repoLoaded = false;
+    private boolean hasLocalRepo = false;
     private static final String originRepoUrl = "https://modules.lsposed.org/";
     private static final String backupRepoUrl = "https://modules-blogcdn.lsposed.org/";
 
@@ -97,7 +98,8 @@ public class RepoLoader {
     }
 
     synchronized public void loadRemoteData() {
-        repoLoaded = false;
+        repoLoaded = hasLocalRepo;
+        boolean localDataLoaded = false;
         try {
             try (var response = App.getOkHttpClient().newCall(new Request.Builder().url(repoUrl + "modules.json").build()).execute()) {
 
@@ -108,6 +110,7 @@ public class RepoLoader {
                             String bodyString = body.string();
                             Files.write(repoFile, bodyString.getBytes(StandardCharsets.UTF_8));
                             loadLocalData(false);
+                            localDataLoaded = true;
                         } catch (Throwable t) {
                             Log.e(App.TAG, Log.getStackTraceString(t));
                             for (RepoListener listener : listeners) {
@@ -129,13 +132,21 @@ public class RepoLoader {
                 repoUrl = secondBackupRepoUrl;
                 loadRemoteData();
             }
+        } finally {
+            if (!localDataLoaded) {
+                repoLoaded = hasLocalRepo;
+                for (RepoListener listener : listeners) {
+                    listener.onRepoLoaded();
+                }
+            }
         }
     }
 
     synchronized public void loadLocalData(boolean updateRemoteRepo) {
-        repoLoaded = false;
+        repoLoaded = hasLocalRepo;
         try {
             if (Files.notExists(repoFile)) {
+                repoLoaded = false;
                 loadRemoteData();
                 updateRemoteRepo = false;
             }
@@ -145,16 +156,18 @@ public class RepoLoader {
             Map<String, OnlineModule> modules = new HashMap<>();
             OnlineModule[] repoModules = gson.fromJson(bodyString, OnlineModule[].class);
             Arrays.stream(repoModules).forEach(onlineModule -> modules.put(onlineModule.getName(), onlineModule));
+            onlineModules = modules;
+            hasLocalRepo = true;
+            repoLoaded = true;
             var channel = App.getPreferences().getString("update_channel", channels[0]);
             updateLatestVersion(repoModules, channel);
-            onlineModules = modules;
         } catch (Throwable t) {
             Log.e(App.TAG, Log.getStackTraceString(t));
             for (RepoListener listener : listeners) {
                 listener.onThrowable(t);
             }
         } finally {
-            repoLoaded = true;
+            repoLoaded = hasLocalRepo;
             for (RepoListener listener : listeners) {
                 listener.onRepoLoaded();
             }
@@ -163,7 +176,6 @@ public class RepoLoader {
     }
 
     synchronized private void updateLatestVersion(OnlineModule[] onlineModules, String channel) {
-        repoLoaded = false;
         Map<String, ModuleVersion> versions = new ConcurrentHashMap<>();
         for (var module : onlineModules) {
             String release = module.getLatestRelease();

@@ -63,6 +63,7 @@ import org.lsposed.manager.util.ModuleUtil;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.format.FormatStyle;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -296,15 +297,23 @@ public class RepoFragment extends BaseFragment implements RepoLoader.RepoListene
             return null;
         }
 
+        private Instant getLatestReleaseInstant(OnlineModule module) {
+            String latestReleaseTime = repoLoader.getLatestReleaseTime(module.getName(), channel);
+            if (latestReleaseTime == null) latestReleaseTime = module.getLatestReleaseTime();
+            try {
+                return latestReleaseTime == null ? Instant.EPOCH : Instant.parse(latestReleaseTime);
+            } catch (DateTimeParseException ignored) {
+                return Instant.EPOCH;
+            }
+        }
+
         @Override
         public void onBindViewHolder(@NonNull RepoAdapter.ViewHolder holder, int position) {
             OnlineModule module = showList.get(position);
             holder.appName.setText(module.getDescription());
             holder.appPackageName.setText(module.getName());
-            Instant instant;
             channel = App.getPreferences().getString("update_channel", channels[0]);
-            var latestReleaseTime = repoLoader.getLatestReleaseTime(module.getName(), channel);
-            instant = Instant.parse(latestReleaseTime != null ? latestReleaseTime : module.getLatestReleaseTime());
+            Instant instant = getLatestReleaseInstant(module);
             var formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
                     .withLocale(App.getLocale()).withZone(ZoneId.systemDefault());
             holder.publishedTime.setText(String.format(getString(R.string.module_repo_updated_time), formatter.format(instant)));
@@ -346,7 +355,7 @@ public class RepoFragment extends BaseFragment implements RepoLoader.RepoListene
             }
 
             holder.itemView.setOnClickListener(v -> {
-                searchView.clearFocus();
+                if (searchView != null) searchView.clearFocus();
                 safeNavigate(RepoFragmentDirections.actionRepoFragmentToRepoItemFragment(module.getName()));
             });
             holder.itemView.setTooltipText(module.getDescription());
@@ -373,7 +382,7 @@ public class RepoFragment extends BaseFragment implements RepoLoader.RepoListene
             int sort = App.getPreferences().getInt("repo_sort", 0);
             boolean upgradableFirst = App.getPreferences().getBoolean("upgradable_first", true);
             ConcurrentHashMap<String, Boolean> upgradable = new ConcurrentHashMap<>();
-            fullList = modules.parallelStream().filter((onlineModule -> !onlineModule.isHide() && !(repoLoader.getReleases(onlineModule.getName()) != null && repoLoader.getReleases(onlineModule.getName()).isEmpty())))
+            fullList = modules.stream().filter((onlineModule -> !onlineModule.isHide() && !(repoLoader.getReleases(onlineModule.getName()) != null && repoLoader.getReleases(onlineModule.getName()).isEmpty())))
                     .sorted((a, b) -> {
                         if (upgradableFirst) {
                             var aUpgrade = upgradable.computeIfAbsent(a.getName(), n -> getUpgradableVer(a) != null);
@@ -384,7 +393,7 @@ public class RepoFragment extends BaseFragment implements RepoLoader.RepoListene
                         if (sort == 0) {
                             return labelComparator.compare(a.getDescription(), b.getDescription());
                         } else {
-                            return Instant.parse(repoLoader.getLatestReleaseTime(b.getName(), channel)).compareTo(Instant.parse(repoLoader.getLatestReleaseTime(a.getName(), channel)));
+                            return getLatestReleaseInstant(b).compareTo(getLatestReleaseInstant(a));
                         }
                     }).collect(Collectors.toList());
             String queryStr = searchView != null ? searchView.getQuery().toString() : "";
@@ -447,7 +456,7 @@ public class RepoFragment extends BaseFragment implements RepoLoader.RepoListene
             protected FilterResults performFiltering(CharSequence constraint) {
                 FilterResults filterResults = new FilterResults();
                 ArrayList<OnlineModule> filtered = new ArrayList<>();
-                String filter = constraint.toString().toLowerCase();
+                String filter = constraint == null ? "" : constraint.toString().toLowerCase();
                 for (OnlineModule info : fullList) {
                     if (lowercaseContains(info.getDescription(), filter) ||
                             lowercaseContains(info.getName(), filter) ||
