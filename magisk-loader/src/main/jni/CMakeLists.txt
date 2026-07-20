@@ -7,7 +7,7 @@ configure_file(template/loader.cpp src/loader.cpp)
 
 aux_source_directory(src SRC_LIST)
 
-set(SRC_LIST ${SRC_LIST} api/zygisk_main.cpp)
+set(SRC_LIST ${SRC_LIST} api/zygisk_main.cpp api/scope_prefilter.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST} ${CMAKE_CURRENT_BINARY_DIR}/src/loader.cpp)
 
@@ -15,7 +15,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC include)
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 target_compile_definitions(${PROJECT_NAME} PRIVATE LOG_DISABLED)
 
-target_link_libraries(${PROJECT_NAME} core)
+target_link_libraries(${PROJECT_NAME} core dl)
 
 if (DEFINED DEBUG_SYMBOLS_PATH)
     set(DEBUG_SYMBOLS_PATH ${DEBUG_SYMBOLS_PATH}/${API})

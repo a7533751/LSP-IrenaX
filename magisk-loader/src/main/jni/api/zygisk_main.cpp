@@ -27,6 +27,7 @@
 #include "loader.h"
 #include "config_impl.h"
 #include "magisk_loader.h"
+#include "scope_prefilter.h"
 #include "symbol_cache.h"
 
 namespace lspd {
@@ -36,6 +37,7 @@ namespace lspd {
     class ZygiskModule : public zygisk::ModuleBase {
         JNIEnv *env_;
         zygisk::Api *api_;
+        bool skip_before_injection_ = false;
 
         void onLoad(zygisk::Api *api, JNIEnv *env) override {
             env_ = env;
@@ -45,12 +47,25 @@ namespace lspd {
         }
 
         void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
+            skip_before_injection_ = false;
+            const auto decision = QueryScopeBeforeSpecialize(
+                    api_, env_, args->uid, args->nice_name, args->app_data_dir);
+            if (decision == ScopeDecision::NotTargeted) {
+                skip_before_injection_ = true;
+                return;
+            }
+
             MagiskLoader::GetInstance()->OnNativeForkAndSpecializePre(
                     env_, args->uid, args->gids, args->nice_name,
                     args->is_child_zygote ? *args->is_child_zygote : false, args->app_data_dir);
         }
 
         void postAppSpecialize(const zygisk::AppSpecializeArgs *args) override {
+            if (skip_before_injection_) {
+                api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+                return;
+            }
+
             MagiskLoader::GetInstance()->OnNativeForkAndSpecializePost(env_, args->nice_name, args->app_data_dir);
             if (*allowUnload) api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
         }
@@ -76,3 +91,4 @@ namespace lspd {
 } //namespace lspd
 
 REGISTER_ZYGISK_MODULE(lspd::ZygiskModule);
+REGISTER_ZYGISK_COMPANION(lspd::HandleScopeQuery);
