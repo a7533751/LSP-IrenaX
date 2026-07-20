@@ -1,11 +1,15 @@
 #include "scope_prefilter.h"
 
+#include <array>
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <dlfcn.h>
 #include <mutex>
 #include <string>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <utility>
 
@@ -14,9 +18,17 @@
 namespace lspd {
 namespace {
 
-constexpr std::uint8_t kProtocolVersion = 1;
+constexpr std::uint8_t kProtocolVersion = 2;
 constexpr std::uint32_t kMaxPackageNameLength = 256;
 constexpr int kPerUserRange = 100000;
+constexpr long kSocketTimeoutMicros = 250000;
+
+constexpr size_t kProtocolVersionOffset = 0;
+constexpr size_t kPackageNameLengthOffset =
+        kProtocolVersionOffset + sizeof(kProtocolVersion);
+constexpr size_t kUserIdOffset = kPackageNameLengthOffset + sizeof(std::uint32_t);
+constexpr size_t kRequestHeaderSize = kUserIdOffset + sizeof(std::int32_t);
+constexpr size_t kMaxRequestSize = kRequestHeaderSize + kMaxPackageNameLength;
 
 constexpr int kSqliteOk = 0;
 constexpr int kSqliteRow = 100;
@@ -25,6 +37,12 @@ constexpr int kSqliteOpenReadOnly = 0x00000001;
 
 struct sqlite3;
 struct sqlite3_stmt;
+
+bool ConfigureReceiveTimeout(int fd) {
+    timeval timeout{};
+    timeout.tv_usec = kSocketTimeoutMicros;
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == 0;
+}
 
 ssize_t ReadFully(int fd, void *buffer, size_t size) {
     auto *cursor = static_cast<std::uint8_t *>(buffer);
@@ -45,7 +63,7 @@ ssize_t WriteFully(int fd, const void *buffer, size_t size) {
     const auto *cursor = static_cast<const std::uint8_t *>(buffer);
     size_t consumed = 0;
     while (consumed < size) {
-        ssize_t result = write(fd, cursor + consumed, size - consumed);
+        ssize_t result = send(fd, cursor + consumed, size - consumed, MSG_NOSIGNAL);
         if (result < 0) {
             if (errno == EINTR) continue;
             return -1;
@@ -168,9 +186,10 @@ private:
                 "SELECT 1 FROM modules "
                 "WHERE module_pkg_name = ?1 AND enabled = 1 "
                 "UNION ALL "
-                "SELECT 1 FROM scope INNER JOIN modules ON scope.mid = modules.mid "
-                "WHERE scope.app_pkg_name = ?2 AND scope.user_id = ?3 "
-                "AND modules.enabled = 1 LIMIT 1";
+                "SELECT 1 FROM modules AS m "
+                "WHERE m.enabled = 1 AND EXISTS ("
+                "SELECT 1 FROM scope AS s WHERE s.mid = m.mid "
+                "AND s.app_pkg_name = ?2 AND s.user_id = ?3) LIMIT 1";
         if (api_.prepare_v2(database_, query, -1, &statement_, nullptr) != kSqliteOk ||
             statement_ == nullptr) {
             CloseDatabase();
@@ -210,13 +229,22 @@ ScopeDecision QueryScopeBeforeSpecialize(zygisk::Api *api, JNIEnv *env, jint uid
 
     const int client = api->connectCompanion();
     if (client < 0) return ScopeDecision::Unknown;
+    if (!ConfigureReceiveTimeout(client)) {
+        close(client);
+        return ScopeDecision::Unknown;
+    }
 
     const std::uint32_t package_name_length = static_cast<std::uint32_t>(package_name.size());
     const std::int32_t user_id = uid / kPerUserRange;
-    if (WriteFully(client, &kProtocolVersion, sizeof(kProtocolVersion)) < 0 ||
-        WriteFully(client, &package_name_length, sizeof(package_name_length)) < 0 ||
-        WriteFully(client, package_name.data(), package_name.size()) < 0 ||
-        WriteFully(client, &user_id, sizeof(user_id)) < 0) {
+    std::array<std::uint8_t, kMaxRequestSize> request{};
+    request[kProtocolVersionOffset] = kProtocolVersion;
+    std::memcpy(request.data() + kPackageNameLengthOffset, &package_name_length,
+                sizeof(package_name_length));
+    std::memcpy(request.data() + kUserIdOffset, &user_id, sizeof(user_id));
+    std::memcpy(request.data() + kRequestHeaderSize, package_name.data(), package_name.size());
+    const size_t request_size = kRequestHeaderSize + package_name.size();
+    if (WriteFully(client, request.data(), request_size) !=
+        static_cast<ssize_t>(request_size)) {
         close(client);
         return ScopeDecision::Unknown;
     }
@@ -233,21 +261,25 @@ ScopeDecision QueryScopeBeforeSpecialize(zygisk::Api *api, JNIEnv *env, jint uid
 
 void HandleScopeQuery(int client) {
     ScopeDecision decision = ScopeDecision::Unknown;
-    std::uint8_t protocol_version = 0;
-    std::uint32_t package_name_length = 0;
-    std::int32_t user_id = 0;
+    std::array<std::uint8_t, kRequestHeaderSize> request_header{};
+    if (ReadFully(client, request_header.data(), request_header.size()) ==
+                static_cast<ssize_t>(request_header.size()) &&
+        request_header[kProtocolVersionOffset] == kProtocolVersion) {
+        std::uint32_t package_name_length = 0;
+        std::int32_t user_id = 0;
+        std::memcpy(&package_name_length,
+                    request_header.data() + kPackageNameLengthOffset,
+                    sizeof(package_name_length));
+        std::memcpy(&user_id, request_header.data() + kUserIdOffset, sizeof(user_id));
+        if (package_name_length == 0 || package_name_length > kMaxPackageNameLength) {
+            WriteFully(client, &decision, sizeof(decision));
+            close(client);
+            return;
+        }
 
-    if (ReadFully(client, &protocol_version, sizeof(protocol_version)) ==
-                static_cast<ssize_t>(sizeof(protocol_version)) &&
-        protocol_version == kProtocolVersion &&
-        ReadFully(client, &package_name_length, sizeof(package_name_length)) ==
-                static_cast<ssize_t>(sizeof(package_name_length)) &&
-        package_name_length > 0 && package_name_length <= kMaxPackageNameLength) {
         std::string package_name(package_name_length, '\0');
         if (ReadFully(client, package_name.data(), package_name.size()) ==
-                    static_cast<ssize_t>(package_name.size()) &&
-            ReadFully(client, &user_id, sizeof(user_id)) ==
-                    static_cast<ssize_t>(sizeof(user_id))) {
+                    static_cast<ssize_t>(package_name.size())) {
             decision = GetScopeDatabase().Query(package_name, user_id);
         }
     }
